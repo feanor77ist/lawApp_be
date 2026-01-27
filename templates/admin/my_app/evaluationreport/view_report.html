@@ -1,0 +1,162 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url 'admin:my_app_evaluationreport_changelist' %}">Evaluation Reports</a>
+&rsaquo; {% trans 'View Report' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="report-view-container" style="max-width: 1200px; margin: 20px auto; padding: 20px;">
+    <h1 style="color: #417690; margin-bottom: 20px;">Değerlendirme Raporu</h1>
+    
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <td style="padding: 8px; font-weight: bold; width: 150px;">Kullanıcı:</td>
+                <td style="padding: 8px;">{{ report.user.get_full_name|default:report.user.username }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; font-weight: bold;">Eğitim Grubu:</td>
+                <td style="padding: 8px;">{{ report.training_group.name }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; font-weight: bold;">Senaryo:</td>
+                <td style="padding: 8px;">{{ report.scenario.name }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; font-weight: bold;">Değerlendirme Türü:</td>
+                <td style="padding: 8px;">{{ report.get_type_display }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; font-weight: bold;">Puan:</td>
+                <td style="padding: 8px; font-size: 18px; font-weight: bold; color: #417690;">{{ report.score }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; font-weight: bold;">Deneme Sayısı:</td>
+                <td style="padding: 8px;">{{ report.attempt_count }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; font-weight: bold;">Tarih:</td>
+                <td style="padding: 8px;">{{ report.created_at|date:"d.m.Y H:i" }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <a href="{% url 'admin:my_app_evaluationreport_export_pdf' report.id %}" 
+           class="button" 
+           style="display: inline-block; padding: 10px 15px; background: #417690; color: white; text-decoration: none; border-radius: 4px; margin-right: 10px;">
+            📄 PDF Olarak İndir
+        </a>
+        <a href="{% url 'admin:my_app_evaluationreport_changelist' %}" 
+           class="button" 
+           style="display: inline-block; padding: 10px 15px; background: #ba2121; color: white; text-decoration: none; border-radius: 4px;">
+            ← Geri Dön
+        </a>
+    </div>
+
+    <div style="background: white; padding: 30px; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #417690; border-bottom: 2px solid #417690; padding-bottom: 10px; margin-bottom: 20px;">
+            Rapor İçeriği
+        </h2>
+        <div class="markdown-content" style="line-height: 1.8; color: #333;">
+            {{ html_content|safe }}
+        </div>
+    </div>
+
+    <style>
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            color: #417690;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+
+        .markdown-content h1 { font-size: 2em; }
+        .markdown-content h2 { font-size: 1.5em; }
+        .markdown-content h3 { font-size: 1.3em; }
+
+        .markdown-content p {
+            margin-bottom: 1em;
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin-left: 2em;
+            margin-bottom: 1em;
+        }
+
+        .markdown-content li {
+            margin-bottom: 0.5em;
+        }
+
+        .markdown-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+
+        .markdown-content table th,
+        .markdown-content table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .markdown-content table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+
+        .markdown-content code {
+            background-color: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .markdown-content pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border-left: 4px solid #417690;
+        }
+
+        .markdown-content pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+
+        .markdown-content blockquote {
+            border-left: 4px solid #417690;
+            padding-left: 1em;
+            margin-left: 0;
+            color: #666;
+            font-style: italic;
+        }
+
+        .markdown-content a {
+            color: #417690;
+            text-decoration: none;
+        }
+
+        .markdown-content a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</div>
+{% endblock %}
+

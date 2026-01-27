@@ -1,0 +1,18 @@
+{% autoescape off %}
+Merhaba {{ user.get_full_name|default:user.username }},
+
+SimAct sistemine başarıyla kaydoldunuz. Şifrenizi oluşturmak için aşağıdaki bağlantıya tıklayın:
+
+🔗 {{ protocol }}://{{ domain }}{% url 'password_reset_confirm' uidb64=uid token=token %}
+
+Bu bağlantı sadece bir kez kullanılabilir ve kısa süre içinde geçerliliğini yitirir.
+
+Kullanıcı adınız: {{ user.username }}
+
+Giriş Adresiniz: https://dalecarnegie.com.tr/simact/giris/
+
+Herhangi bir sorunuz olursa bize ulaşmaktan çekinmeyin.
+İyi çalışmalar!
+
+DaleCarnegie Ekibi
+{% endautoescape %}

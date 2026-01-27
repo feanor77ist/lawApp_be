@@ -1,0 +1,802 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block after_field_sets %}
+{{ block.super }}
+
+{% if original %}
+<style>
+.customer-filter-wrapper {
+    margin: 0 0 0.5em 0;
+}
+
+.customer-filter-wrapper input[type="text"] {
+    width: 100%;
+    padding: 4px 6px;
+    font-size: 13px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    background-color: #fff;
+    color: #000;
+    margin-bottom: 2px;
+}
+
+[data-theme="dark"] .customer-filter-wrapper input[type="text"] {
+    background-color: #1e1e1e !important;
+    border-color: #555 !important;
+    color: #eee !important;
+}
+
+.filter-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #fff;
+    padding: 4px 0;
+    margin-top: 2px;
+}
+
+[data-theme="dark"] .filter-list {
+    background-color: #1e1e1e !important;
+    border-color: #555 !important;
+}
+
+.filter-list ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.filter-list li {
+    padding: 4px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #000;
+}
+
+[data-theme="dark"] .filter-list li {
+    color: #eee !important;
+}
+
+.filter-list li:hover {
+    background-color: #f0f0f0;
+}
+
+[data-theme="dark"] .filter-list li:hover {
+    background-color: #2d2d2d !important;
+}
+
+.filter-list li.selected {
+    background-color: #79aec8;
+    color: #fff;
+}
+
+[data-theme="dark"] .filter-list li.selected {
+    background-color: #417690 !important;
+    color: #fff !important;
+}
+
+.filter-list li.selected:hover {
+    background-color: #609ab6;
+}
+
+[data-theme="dark"] .filter-list li.selected:hover {
+    background-color: #205067 !important;
+}
+
+.filter-list li input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.filter-list li label {
+    cursor: pointer;
+    flex: 1;
+    margin: 0;
+    padding-left: 4px;
+    user-select: none;
+    font-weight: normal;
+}
+
+/* Customer Report Section */
+.customer-report-section {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+[data-theme="dark"] .customer-report-section {
+    background-color: #1e1e1e !important;
+    border-color: #555 !important;
+}
+
+.customer-report-section h2 {
+    margin-top: 0;
+    color: #000;
+}
+
+[data-theme="dark"] .customer-report-section h2 {
+    color: #eee !important;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 250px;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #000;
+}
+
+[data-theme="dark"] .filter-group label {
+    color: #eee !important;
+}
+
+.customer-report-container {
+    margin-top: 20px;
+}
+
+.customer-report-container p {
+    color: #6c757d;
+    font-style: italic;
+}
+
+[data-theme="dark"] .customer-report-container p {
+    color: #aaa !important;
+}
+
+.customer-report-container .loading {
+    color: #6c757d;
+}
+
+[data-theme="dark"] .customer-report-container .loading {
+    color: #aaa !important;
+}
+
+.customer-report-container .error {
+    color: #dc3545;
+}
+
+[data-theme="dark"] .customer-report-container .error {
+    color: #ff6b6b !important;
+}
+
+/* Report Table Styles */
+.report-table-wrapper {
+    overflow-x: auto;
+}
+
+.report-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    margin-top: 10px;
+    background-color: #fff;
+}
+
+[data-theme="dark"] .report-table {
+    background-color: #1e1e1e !important;
+    color: #eee !important;
+}
+
+.report-table thead tr {
+    background-color: #f5f5f5;
+}
+
+[data-theme="dark"] .report-table thead tr {
+    background-color: #2d2d2d !important;
+}
+
+.report-table thead tr.secondary {
+    background-color: #f9f9f9;
+}
+
+[data-theme="dark"] .report-table thead tr.secondary {
+    background-color: #252525 !important;
+}
+
+.report-table th,
+.report-table td {
+    border: 1px solid #ccc;
+    padding: 4px;
+    white-space: nowrap;
+}
+
+[data-theme="dark"] .report-table th,
+[data-theme="dark"] .report-table td {
+    border-color: #555 !important;
+    color: #eee !important;
+}
+
+.report-table th {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.report-table td {
+    text-align: center;
+}
+
+.report-table tbody tr {
+    background-color: #fff;
+}
+
+[data-theme="dark"] .report-table tbody tr {
+    background-color: #1e1e1e !important;
+}
+
+.report-table tbody tr:hover {
+    background-color: #f5f5f5;
+}
+
+[data-theme="dark"] .report-table tbody tr:hover {
+    background-color: #2d2d2d !important;
+}
+
+.improvement-positive {
+    color: #2e7d32;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .improvement-positive {
+    color: #4caf50 !important;
+}
+
+.improvement-negative {
+    color: #c62828;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .improvement-negative {
+    color: #f44336 !important;
+}
+</style>
+
+<div id="customer-report-section" 
+     class="customer-report-section"
+     data-customer-id="{{ original.id }}"
+     data-filters-url="{% url 'admin:my_app_customer_customer_filters' original.id %}"
+     data-report-url="{% url 'admin:my_app_customer_customer_report' original.id %}">
+    <h2>📊 Müşteri Raporu</h2>
+    
+    <div style="display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;">
+        <div class="filter-group">
+            <label>Program:</label>
+            <div class="customer-filter-wrapper">
+                <input type="text" 
+                       id="search_program" 
+                       placeholder="Program ara..."
+                       autocomplete="off" />
+                <input type="hidden" id="id_program_filter" value="" />
+            </div>
+            <div class="filter-list" id="program_list" style="display: none;">
+                <ul id="program_options"></ul>
+            </div>
+        </div>
+        
+        <div class="filter-group">
+            <label>Eğitim Grubu:</label>
+            <div class="customer-filter-wrapper">
+                <input type="text" 
+                       id="search_training_group" 
+                       placeholder="Eğitim Grubu ara..."
+                       autocomplete="off" />
+                <input type="hidden" id="id_training_group_filter" value="" />
+            </div>
+            <div class="filter-list" id="training_group_list" style="display: none;">
+                <ul id="training_group_options"></ul>
+            </div>
+        </div>
+        
+        <div class="filter-group">
+            <label>Program Senaryosu:</label>
+            <div class="customer-filter-wrapper">
+                <input type="text" 
+                       id="search_program_scenario" 
+                       placeholder="Program Senaryosu ara..."
+                       autocomplete="off" />
+                <input type="hidden" id="id_program_scenario_filter" value="" />
+            </div>
+            <div class="filter-list" id="program_scenario_list" style="display: none;">
+                <ul id="program_scenario_options"></ul>
+            </div>
+        </div>
+    </div>
+    
+    <div id="customer_report_container" class="customer-report-container">
+        <p>Filtre seçerek raporu görüntüleyin.</p>
+    </div>
+</div>
+
+<script>
+(function($) {
+    const $reportSection = $('#customer-report-section');
+    if (!$reportSection.length) return;
+    
+    const customerId = parseInt($reportSection.data('customer-id'), 10);
+    const filtersUrl = $reportSection.data('filters-url');
+    const reportUrl = $reportSection.data('report-url');
+    
+    // Store all data
+    let allTrainingGroups = [];
+    let allPrograms = [];
+    let allProgramScenarios = [];
+    
+    // Store selected values (arrays)
+    let selectedTrainingGroups = [];
+    let selectedPrograms = [];
+    let selectedProgramScenarios = [];
+    
+    // Filter function (CustomerListFilter'daki gibi)
+    function filterOptions(searchInputId, listId, optionsId, dataArray) {
+        const input = document.getElementById(searchInputId);
+        const filter = input.value.toLowerCase();
+        const items = document.querySelectorAll('#' + optionsId + ' li');
+        
+        items.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            item.style.display = text.includes(filter) ? "" : "none";
+        });
+    }
+    
+    // Populate list function with checkboxes
+    function populateList(optionsId, dataArray, selectedValuesRef, onSelect, filterType) {
+        const $list = $('#' + optionsId);
+        $list.empty();
+        
+        // "Tümü" option with checkbox
+        const allSelected = selectedValuesRef.length === dataArray.length && dataArray.length > 0;
+        const $allOption = $('<li data-value="all"><input type="checkbox" id="' + optionsId + '_all" ' + (allSelected ? 'checked' : '') + '><label for="' + optionsId + '_all">Tümü</label></li>');
+        
+        if (allSelected) {
+            $allOption.addClass('selected');
+        }
+        
+        // Handle checkbox change event (works for both click and label click)
+        $allOption.find('input[type="checkbox"]').on('change', function(e) {
+            e.stopPropagation();
+            const checkbox = $(this);
+            const isChecked = checkbox.prop('checked');
+            
+            // Toggle all checkboxes
+            $('#' + optionsId + ' li:not([data-value="all"]) input[type="checkbox"]').prop('checked', isChecked);
+            
+            // Update selected values array (modify the reference)
+            selectedValuesRef.length = 0;
+            if (isChecked) {
+                dataArray.forEach(function(item) {
+                    selectedValuesRef.push(String(item.id));
+                });
+            }
+            
+            // Update visual state
+            $('#' + optionsId + ' li').removeClass('selected');
+            if (isChecked) {
+                $('#' + optionsId + ' li').addClass('selected');
+            }
+            
+            onSelect(selectedValuesRef.slice()); // Pass a copy
+        });
+        
+        $allOption.on('click', function(e) {
+            // Skip if clicking on checkbox (already handled above)
+            if ($(e.target).is('input[type="checkbox"]')) {
+                return;
+            }
+            e.stopPropagation();
+            e.preventDefault();
+            const checkbox = $(this).find('input[type="checkbox"]');
+            const wasChecked = checkbox.is(':checked');
+            const isChecked = !wasChecked;
+            
+            // Toggle checkbox state
+            checkbox.prop('checked', isChecked);
+            
+            // Toggle all checkboxes
+            $('#' + optionsId + ' li:not([data-value="all"]) input[type="checkbox"]').prop('checked', isChecked);
+            
+            // Update selected values array (modify the reference)
+            selectedValuesRef.length = 0;
+            if (isChecked) {
+                dataArray.forEach(function(item) {
+                    selectedValuesRef.push(String(item.id));
+                });
+            }
+            
+            // Update visual state
+            $('#' + optionsId + ' li').removeClass('selected');
+            if (isChecked) {
+                $('#' + optionsId + ' li').addClass('selected');
+            }
+            
+            onSelect(selectedValuesRef.slice()); // Pass a copy
+        });
+        
+        // Label click should trigger li click
+        $allOption.find('label').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $(this).closest('li').click();
+        });
+        $list.append($allOption);
+        
+        // Data options with checkboxes
+        dataArray.forEach(function(item) {
+            const isSelected = selectedValuesRef.includes(String(item.id));
+            const $option = $('<li data-value="' + item.id + '"><input type="checkbox" id="' + optionsId + '_' + item.id + '" ' + (isSelected ? 'checked' : '') + '><label for="' + optionsId + '_' + item.id + '">' + item.name + '</label></li>');
+            
+            if (isSelected) {
+                $option.addClass('selected');
+            }
+            
+            // Handle checkbox change event (works for both click and label click)
+            $option.find('input[type="checkbox"]').on('change', function(e) {
+                e.stopPropagation();
+                const checkbox = $(this);
+                const isChecked = checkbox.prop('checked');
+                const itemId = String(item.id);
+                
+                // Update selected values array (modify the reference)
+                if (isChecked) {
+                    if (!selectedValuesRef.includes(itemId)) {
+                        selectedValuesRef.push(itemId);
+                    }
+                } else {
+                    const index = selectedValuesRef.indexOf(itemId);
+                    if (index > -1) {
+                        selectedValuesRef.splice(index, 1);
+                    }
+                }
+                
+                // Update "Tümü" checkbox
+                const allCheckbox = $('#' + optionsId + '_all');
+                const allChecked = selectedValuesRef.length === dataArray.length && dataArray.length > 0;
+                allCheckbox.prop('checked', allChecked);
+                
+                // Update visual state
+                if (isChecked) {
+                    $option.addClass('selected');
+                } else {
+                    $option.removeClass('selected');
+                }
+                
+                // Update "Tümü" visual state
+                if (allChecked) {
+                    $allOption.addClass('selected');
+                } else {
+                    $allOption.removeClass('selected');
+                }
+                
+                onSelect(selectedValuesRef.slice()); // Pass a copy
+            });
+            
+            $option.on('click', function(e) {
+                // Skip if clicking on checkbox (already handled above)
+                if ($(e.target).is('input[type="checkbox"]')) {
+                    return;
+                }
+                e.stopPropagation();
+                e.preventDefault();
+                const checkbox = $(this).find('input[type="checkbox"]');
+                const wasChecked = checkbox.is(':checked');
+                const isChecked = !wasChecked;
+                const itemId = String(item.id);
+                
+                // Toggle checkbox state
+                checkbox.prop('checked', isChecked);
+                
+                // Update selected values array (modify the reference)
+                if (isChecked) {
+                    if (!selectedValuesRef.includes(itemId)) {
+                        selectedValuesRef.push(itemId);
+                    }
+                } else {
+                    const index = selectedValuesRef.indexOf(itemId);
+                    if (index > -1) {
+                        selectedValuesRef.splice(index, 1);
+                    }
+                }
+                
+                // Update "Tümü" checkbox
+                const allCheckbox = $('#' + optionsId + '_all');
+                const allChecked = selectedValuesRef.length === dataArray.length && dataArray.length > 0;
+                allCheckbox.prop('checked', allChecked);
+                
+                // Update visual state
+                if (isChecked) {
+                    $option.addClass('selected');
+                } else {
+                    $option.removeClass('selected');
+                }
+                
+                // Update "Tümü" visual state
+                if (allChecked) {
+                    $allOption.addClass('selected');
+                } else {
+                    $allOption.removeClass('selected');
+                }
+                
+                onSelect(selectedValuesRef.slice()); // Pass a copy
+            });
+            
+            // Label click should trigger li click
+            $option.find('label').on('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $(this).closest('li').click();
+            });
+            $list.append($option);
+        });
+    }
+    
+    // Show/hide list
+    function toggleList(listId, show) {
+        const $list = $('#' + listId);
+        if (show) {
+            $list.show();
+        } else {
+            setTimeout(function() {
+                $list.hide();
+            }, 200);
+        }
+    }
+    
+    // Initialize filters
+    function initializeFilters() {
+        // Training Group
+        $('#search_training_group').on('focus', function() {
+            toggleList('training_group_list', true);
+        }).on('input', function() {
+            filterOptions('search_training_group', 'training_group_list', 'training_group_options', allTrainingGroups);
+        });
+        
+        $(document).on('click', function(e) {
+            // Don't close if clicking on checkbox or label
+            if (!$(e.target).closest('#search_training_group, #training_group_list').length && 
+                !$(e.target).is('input[type="checkbox"]') && 
+                !$(e.target).is('label')) {
+                toggleList('training_group_list', false);
+            }
+        });
+        
+        // Program
+        $('#search_program').on('focus', function() {
+            toggleList('program_list', true);
+        }).on('input', function() {
+            filterOptions('search_program', 'program_list', 'program_options', allPrograms);
+        });
+        
+        $(document).on('click', function(e) {
+            // Don't close if clicking on checkbox or label
+            if (!$(e.target).closest('#search_program, #program_list').length && 
+                !$(e.target).is('input[type="checkbox"]') && 
+                !$(e.target).is('label')) {
+                toggleList('program_list', false);
+            }
+        });
+        
+        // Program Scenario
+        $('#search_program_scenario').on('focus', function() {
+            toggleList('program_scenario_list', true);
+        }).on('input', function() {
+            filterOptions('search_program_scenario', 'program_scenario_list', 'program_scenario_options', allProgramScenarios);
+        });
+        
+        $(document).on('click', function(e) {
+            // Don't close if clicking on checkbox or label
+            if (!$(e.target).closest('#search_program_scenario, #program_scenario_list').length && 
+                !$(e.target).is('input[type="checkbox"]') && 
+                !$(e.target).is('label')) {
+                toggleList('program_scenario_list', false);
+            }
+        });
+    }
+    
+    // Load filter data
+    function loadFilterData() {
+        $.ajax({
+            url: filtersUrl,
+            success: function(response) {
+                allTrainingGroups = response.training_groups || [];
+                allPrograms = response.programs || [];
+                
+                populateList('training_group_options', allTrainingGroups, selectedTrainingGroups, function(values) {
+                    // values is a copy, but we already modified the reference
+                    updateFilterDisplay('training_group', selectedTrainingGroups, allTrainingGroups);
+                    loadReport();
+                }, 'training_group');
+                
+                populateList('program_options', allPrograms, selectedPrograms, function(values) {
+                    // values is a copy, but we already modified the reference
+                    updateFilterDisplay('program', selectedPrograms, allPrograms);
+                    // Program değiştiğinde senaryoları yenile
+                    if (selectedPrograms.length > 0) {
+                        // Tüm seçili programları gönder (veya tümünü seçildiyse boş gönder)
+                        loadProgramScenarios(selectedPrograms.length === allPrograms.length ? [] : selectedPrograms);
+                    } else {
+                        allProgramScenarios = [];
+                        selectedProgramScenarios.length = 0;
+                        populateList('program_scenario_options', [], selectedProgramScenarios, function(v) {
+                            updateFilterDisplay('program_scenario', selectedProgramScenarios, []);
+                            loadReport();
+                        }, 'program_scenario');
+                    }
+                    loadReport();
+                }, 'program');
+                
+                loadProgramScenarios([]);
+                
+                // İlk yüklemede rapor gösterilmez, kullanıcı filtre seçene kadar beklenir
+            },
+            error: function() {
+                console.error('Filtre verileri yüklenirken hata oluştu');
+            }
+        });
+    }
+    
+    function loadProgramScenarios(programIds) {
+        // programIds can be an array of program IDs or empty array for all
+        const data = {};
+        if (programIds && programIds.length > 0) {
+            data.program_id = programIds;
+        }
+        
+        $.ajax({
+            url: filtersUrl,
+            data: data,
+            traditional: true, // jQuery array serialization
+            success: function(response) {
+                let scenarios = response.program_scenarios || [];
+                // Backend already filters by program_id, so no need to filter again
+                allProgramScenarios = scenarios;
+                
+                populateList('program_scenario_options', scenarios, selectedProgramScenarios, function(values) {
+                    // values is a copy, but we already modified the reference
+                    updateFilterDisplay('program_scenario', selectedProgramScenarios, scenarios);
+                    loadReport();
+                }, 'program_scenario');
+            },
+            error: function() {
+                console.error('Program senaryoları yüklenirken hata oluştu');
+            }
+        });
+    }
+    
+    // Update filter display text
+    function updateFilterDisplay(filterType, selectedValues, dataArray) {
+        const searchInputId = 'search_' + filterType;
+        const $input = $('#' + searchInputId);
+        
+        if (selectedValues.length === 0) {
+            $input.val('');
+        } else if (selectedValues.length === dataArray.length) {
+            $input.val('Tümü seçildi (' + selectedValues.length + ')');
+        } else if (selectedValues.length === 1) {
+            const item = dataArray.find(i => String(i.id) === selectedValues[0]);
+            $input.val(item ? item.name : '');
+        } else {
+            $input.val(selectedValues.length + ' öğe seçildi');
+        }
+    }
+    
+    function loadReport() {
+        // Check if any filter is selected
+        if (selectedTrainingGroups.length === 0 && selectedPrograms.length === 0 && selectedProgramScenarios.length === 0) {
+            $('#customer_report_container').html('<p>Filtre seçerek raporu görüntüleyin.</p>');
+            return;
+        }
+        
+        $('#customer_report_container').html('<p class="loading">Yükleniyor...</p>');
+        
+        // Build data object with arrays
+        const data = {};
+        
+        if (selectedTrainingGroups.length > 0) {
+            data.training_group = selectedTrainingGroups;
+        }
+        if (selectedPrograms.length > 0) {
+            data.program = selectedPrograms;
+        }
+        if (selectedProgramScenarios.length > 0) {
+            data.program_scenario = selectedProgramScenarios;
+        }
+        
+        $.ajax({
+            url: reportUrl,
+            data: data,
+            traditional: true, // jQuery array serialization
+            success: function(response) {
+                renderReport(response);
+            },
+            error: function() {
+                $('#customer_report_container').html('<p class="error">Rapor yüklenirken bir hata oluştu.</p>');
+            }
+        });
+    }
+    
+    function renderReport(response) {
+        if (!response.report_data || response.report_data.length === 0) {
+            $('#customer_report_container').html('<p>Seçilen filtreler için veri bulunamadı.</p>');
+            return;
+        }
+        
+        let rows = '';
+        response.report_data.forEach(function(item) {
+            const improvement = item.improvement_avg_percentage !== null 
+                ? `<span class="${item.improvement_avg_percentage >= 0 ? 'improvement-positive' : 'improvement-negative'}">
+                    ${item.improvement_avg_percentage >= 0 ? '▲' : '▼'} ${item.improvement_avg_percentage}%
+                   </span>`
+                : '-';
+            
+            rows += `
+                <tr>
+                    <td>${item.scenario_name}</td>
+                    <td>${item.program_name}</td>
+                    <td>${item.trainers || '—'}</td>
+                    <td style="font-variant-numeric: tabular-nums;">${item.release_date}</td>
+                    <td>${item.pre_completed}/${item.total_users}</td>
+                    <td>${item.pre_avg}</td>
+                    <td>${item.pre_attempt_avg.toFixed(2)}</td>
+                    <td>${item.post_completed}/${item.total_users}</td>
+                    <td>${item.post_avg}</td>
+                    <td>${item.post_attempt_avg.toFixed(2)}</td>
+                    <td>${improvement}</td>
+                </tr>
+            `;
+        });
+        
+        const html = `
+            <div class="report-table-wrapper">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" style="vertical-align: middle;">Senaryo</th>
+                            <th rowspan="2" style="vertical-align: middle;">Program</th>
+                            <th rowspan="2" style="vertical-align: middle;">Eğitmenler</th>
+                            <th rowspan="2" style="vertical-align: middle; font-variant-numeric: tabular-nums;">Yayın Tarihi</th>
+                            <th colspan="3">Ön Değerlendirme</th>
+                            <th colspan="3">Son Değerlendirme</th>
+                            <th rowspan="2" style="vertical-align: middle;">Gelişim (%)</th>
+                        </tr>
+                        <tr class="secondary">
+                            <th>Tamamlanma</th>
+                            <th>Ort.Puan</th>
+                            <th>Ort.Deneme</th>
+                            <th>Tamamlanma</th>
+                            <th>Ort.Puan</th>
+                            <th>Ort.Deneme</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        $('#customer_report_container').html(html);
+    }
+    
+    // Initialize
+    $(document).ready(function() {
+        if (customerId) {
+            initializeFilters();
+            loadFilterData();
+        }
+    });
+})(typeof django !== 'undefined' && django.jQuery ? django.jQuery : jQuery);
+</script>
+{% endif %}
+{% endblock %}

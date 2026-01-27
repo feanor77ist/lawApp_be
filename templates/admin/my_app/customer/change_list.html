@@ -1,0 +1,844 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+.customer-filter-wrapper {
+    margin: 0 0 0.5em 0;
+}
+
+.customer-filter-wrapper input[type="text"] {
+    width: 100%;
+    padding: 4px 6px;
+    font-size: 13px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    background-color: #fff;
+    color: #000;
+    margin-bottom: 2px;
+}
+
+[data-theme="dark"] .customer-filter-wrapper input[type="text"] {
+    background-color: #1e1e1e !important;
+    border-color: #555 !important;
+    color: #eee !important;
+}
+
+.filter-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #fff;
+    padding: 4px 0;
+    margin-top: 2px;
+}
+
+[data-theme="dark"] .filter-list {
+    background-color: #1e1e1e !important;
+    border-color: #555 !important;
+}
+
+.filter-list ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.filter-list li {
+    padding: 4px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #000;
+}
+
+[data-theme="dark"] .filter-list li {
+    color: #eee !important;
+}
+
+.filter-list li:hover {
+    background-color: #f0f0f0;
+}
+
+[data-theme="dark"] .filter-list li:hover {
+    background-color: #2d2d2d !important;
+}
+
+.filter-list li.selected {
+    background-color: #79aec8;
+    color: #fff;
+}
+
+[data-theme="dark"] .filter-list li.selected {
+    background-color: #417690 !important;
+    color: #fff !important;
+}
+
+.filter-list li.selected:hover {
+    background-color: #609ab6;
+}
+
+[data-theme="dark"] .filter-list li.selected:hover {
+    background-color: #205067 !important;
+}
+
+.filter-list li input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.filter-list li label {
+    cursor: pointer;
+    flex: 1;
+    margin: 0;
+    padding-left: 4px;
+    user-select: none;
+    font-weight: normal;
+}
+
+.customer-report-section {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+[data-theme="dark"] .customer-report-section {
+    background-color: #1e1e1e !important;
+    border-color: #555 !important;
+}
+
+.customer-report-section h2 {
+    margin-top: 0;
+    color: #000;
+}
+
+[data-theme="dark"] .customer-report-section h2 {
+    color: #eee !important;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 250px;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #000;
+}
+
+[data-theme="dark"] .filter-group label {
+    color: #eee !important;
+}
+
+.customer-report-container {
+    margin-top: 20px;
+}
+
+.customer-report-container p {
+    color: #6c757d;
+    font-style: italic;
+}
+
+[data-theme="dark"] .customer-report-container p {
+    color: #aaa !important;
+}
+
+.customer-report-container .loading {
+    color: #6c757d;
+}
+
+[data-theme="dark"] .customer-report-container .loading {
+    color: #aaa !important;
+}
+
+.customer-report-container .error {
+    color: #dc3545;
+}
+
+[data-theme="dark"] .customer-report-container .error {
+    color: #ff6b6b !important;
+}
+
+.report-table-wrapper {
+    overflow-x: auto;
+}
+
+.report-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    margin-top: 10px;
+    background-color: #fff;
+}
+
+[data-theme="dark"] .report-table {
+    background-color: #1e1e1e !important;
+    color: #eee !important;
+}
+
+.report-table thead tr {
+    background-color: #f5f5f5;
+}
+
+[data-theme="dark"] .report-table thead tr {
+    background-color: #2d2d2d !important;
+}
+
+.report-table thead tr.secondary {
+    background-color: #f9f9f9;
+}
+
+[data-theme="dark"] .report-table thead tr.secondary {
+    background-color: #252525 !important;
+}
+
+.report-table th,
+.report-table td {
+    border: 1px solid #ccc;
+    padding: 4px;
+    white-space: nowrap;
+}
+
+[data-theme="dark"] .report-table th,
+[data-theme="dark"] .report-table td {
+    border-color: #555 !important;
+    color: #eee !important;
+}
+
+.report-table th {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.report-table td {
+    text-align: center;
+}
+
+.report-table tbody tr {
+    background-color: #fff;
+}
+
+[data-theme="dark"] .report-table tbody tr {
+    background-color: #1e1e1e !important;
+}
+
+.report-table tbody tr:hover {
+    background-color: #f5f5f5;
+}
+
+[data-theme="dark"] .report-table tbody tr:hover {
+    background-color: #2d2d2d !important;
+}
+
+.improvement-positive {
+    color: #2e7d32;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .improvement-positive {
+    color: #4caf50 !important;
+}
+
+.improvement-negative {
+    color: #c62828;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .improvement-negative {
+    color: #f44336 !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{{ block.super }}
+
+<div style="clear: both; margin-top: 40px;"></div>
+
+<div id="customer-report-section" 
+     class="customer-report-section"
+     data-filters-url="{% url 'admin:my_app_customer_changelist_filters' %}"
+     data-report-url="{% url 'admin:my_app_customer_changelist_report' %}"
+     data-export-url="{% url 'admin:my_app_customer_changelist_export' %}">
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <h2 style="margin: 0;">📊 Müşteri Raporu</h2>
+        <button type="button" id="export-xlsx" class="button">XLSX'e Aktar</button>
+    </div>
+    
+    <div style="display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;">
+        <div class="filter-group">
+            <label>Müşteri:</label>
+            <div class="customer-filter-wrapper">
+                <input type="text" 
+                       id="search_customer" 
+                       placeholder="Müşteri ara..."
+                       autocomplete="off" />
+            </div>
+            <div class="filter-list" id="customer_list" style="display: none;">
+                <ul id="customer_options"></ul>
+            </div>
+        </div>
+        
+        <div class="filter-group">
+            <label>Program:</label>
+            <div class="customer-filter-wrapper">
+                <input type="text" 
+                       id="search_program" 
+                       placeholder="Program ara..."
+                       autocomplete="off" />
+            </div>
+            <div class="filter-list" id="program_list" style="display: none;">
+                <ul id="program_options"></ul>
+            </div>
+        </div>
+        
+        <div class="filter-group">
+            <label>Eğitim Grubu:</label>
+            <div class="customer-filter-wrapper">
+                <input type="text" 
+                       id="search_training_group" 
+                       placeholder="Eğitim Grubu ara..."
+                       autocomplete="off" />
+            </div>
+            <div class="filter-list" id="training_group_list" style="display: none;">
+                <ul id="training_group_options"></ul>
+            </div>
+        </div>
+        
+        <div class="filter-group">
+            <label>Program Senaryosu:</label>
+            <div class="customer-filter-wrapper">
+                <input type="text" 
+                       id="search_program_scenario" 
+                       placeholder="Program Senaryosu ara..."
+                       autocomplete="off" />
+            </div>
+            <div class="filter-list" id="program_scenario_list" style="display: none;">
+                <ul id="program_scenario_options"></ul>
+            </div>
+        </div>
+    </div>
+    
+    <div id="customer_report_container" class="customer-report-container">
+        <p>Filtre seçerek raporu görüntüleyin.</p>
+    </div>
+</div>
+
+<script>
+(function($) {
+    const $reportSection = $('#customer-report-section');
+    if (!$reportSection.length) return;
+    
+    const filtersUrl = $reportSection.data('filters-url');
+    const reportUrl = $reportSection.data('report-url');
+    
+    let allCustomers = [];
+    let allTrainingGroups = [];
+    let allPrograms = [];
+    let allProgramScenarios = [];
+    
+    let selectedCustomers = [];
+    let selectedTrainingGroups = [];
+    let selectedPrograms = [];
+    let selectedProgramScenarios = [];
+    
+    function filterOptions(searchInputId, listId, optionsId, dataArray) {
+        const input = document.getElementById(searchInputId);
+        const filter = input.value.toLowerCase();
+        const items = document.querySelectorAll('#' + optionsId + ' li');
+        
+        items.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            item.style.display = text.includes(filter) ? "" : "none";
+        });
+    }
+    
+    function populateList(optionsId, dataArray, selectedValuesRef, onSelect, filterType) {
+        const $list = $('#' + optionsId);
+        $list.empty();
+        
+        const allSelected = selectedValuesRef.length === dataArray.length && dataArray.length > 0;
+        const $allOption = $('<li data-value="all"><input type="checkbox" id="' + optionsId + '_all" ' + (allSelected ? 'checked' : '') + '><label for="' + optionsId + '_all">Tümü</label></li>');
+        
+        if (allSelected) {
+            $allOption.addClass('selected');
+        }
+        
+        $allOption.find('input[type="checkbox"]').on('change', function(e) {
+            e.stopPropagation();
+            const checkbox = $(this);
+            const isChecked = checkbox.prop('checked');
+            
+            $('#' + optionsId + ' li:not([data-value="all"]) input[type="checkbox"]').prop('checked', isChecked);
+            
+            selectedValuesRef.length = 0;
+            if (isChecked) {
+                dataArray.forEach(function(item) {
+                    selectedValuesRef.push(String(item.id));
+                });
+            }
+            
+            $('#' + optionsId + ' li').removeClass('selected');
+            if (isChecked) {
+                $('#' + optionsId + ' li').addClass('selected');
+            }
+            
+            onSelect(selectedValuesRef.slice());
+        });
+        
+        $allOption.on('click', function(e) {
+            if ($(e.target).is('input[type="checkbox"]')) {
+                return;
+            }
+            e.stopPropagation();
+            e.preventDefault();
+            const checkbox = $(this).find('input[type="checkbox"]');
+            const wasChecked = checkbox.is(':checked');
+            const isChecked = !wasChecked;
+            
+            checkbox.prop('checked', isChecked);
+            $('#' + optionsId + ' li:not([data-value="all"]) input[type="checkbox"]').prop('checked', isChecked);
+            
+            selectedValuesRef.length = 0;
+            if (isChecked) {
+                dataArray.forEach(function(item) {
+                    selectedValuesRef.push(String(item.id));
+                });
+            }
+            
+            $('#' + optionsId + ' li').removeClass('selected');
+            if (isChecked) {
+                $('#' + optionsId + ' li').addClass('selected');
+            }
+            
+            onSelect(selectedValuesRef.slice());
+        });
+        
+        $allOption.find('label').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $(this).closest('li').click();
+        });
+        $list.append($allOption);
+        
+        dataArray.forEach(function(item) {
+            const isSelected = selectedValuesRef.includes(String(item.id));
+            const $option = $('<li data-value="' + item.id + '"><input type="checkbox" id="' + optionsId + '_' + item.id + '" ' + (isSelected ? 'checked' : '') + '><label for="' + optionsId + '_' + item.id + '">' + item.name + '</label></li>');
+            
+            if (isSelected) {
+                $option.addClass('selected');
+            }
+            
+            $option.find('input[type="checkbox"]').on('change', function(e) {
+                e.stopPropagation();
+                const checkbox = $(this);
+                const isChecked = checkbox.prop('checked');
+                const itemId = String(item.id);
+                
+                if (isChecked) {
+                    if (!selectedValuesRef.includes(itemId)) {
+                        selectedValuesRef.push(itemId);
+                    }
+                } else {
+                    const index = selectedValuesRef.indexOf(itemId);
+                    if (index > -1) {
+                        selectedValuesRef.splice(index, 1);
+                    }
+                }
+                
+                const allCheckbox = $('#' + optionsId + '_all');
+                const allChecked = selectedValuesRef.length === dataArray.length && dataArray.length > 0;
+                allCheckbox.prop('checked', allChecked);
+                
+                if (isChecked) {
+                    $option.addClass('selected');
+                } else {
+                    $option.removeClass('selected');
+                }
+                
+                if (allChecked) {
+                    $allOption.addClass('selected');
+                } else {
+                    $allOption.removeClass('selected');
+                }
+                
+                onSelect(selectedValuesRef.slice());
+            });
+            
+            $option.on('click', function(e) {
+                if ($(e.target).is('input[type="checkbox"]')) {
+                    return;
+                }
+                e.stopPropagation();
+                e.preventDefault();
+                const checkbox = $(this).find('input[type="checkbox"]');
+                const wasChecked = checkbox.is(':checked');
+                const isChecked = !wasChecked;
+                const itemId = String(item.id);
+                
+                checkbox.prop('checked', isChecked);
+                
+                if (isChecked) {
+                    if (!selectedValuesRef.includes(itemId)) {
+                        selectedValuesRef.push(itemId);
+                    }
+                } else {
+                    const index = selectedValuesRef.indexOf(itemId);
+                    if (index > -1) {
+                        selectedValuesRef.splice(index, 1);
+                    }
+                }
+                
+                const allCheckbox = $('#' + optionsId + '_all');
+                const allChecked = selectedValuesRef.length === dataArray.length && dataArray.length > 0;
+                allCheckbox.prop('checked', allChecked);
+                
+                if (isChecked) {
+                    $option.addClass('selected');
+                } else {
+                    $option.removeClass('selected');
+                }
+                
+                if (allChecked) {
+                    $allOption.addClass('selected');
+                } else {
+                    $allOption.removeClass('selected');
+                }
+                
+                onSelect(selectedValuesRef.slice());
+            });
+            
+            $option.find('label').on('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $(this).closest('li').click();
+            });
+            $list.append($option);
+        });
+    }
+    
+    function toggleList(listId, show) {
+        const $list = $('#' + listId);
+        if (show) {
+            $list.show();
+        } else {
+            setTimeout(function() {
+                $list.hide();
+            }, 200);
+        }
+    }
+    
+    function initializeFilters() {
+        $('#search_customer').on('focus', function() {
+            toggleList('customer_list', true);
+        }).on('input', function() {
+            filterOptions('search_customer', 'customer_list', 'customer_options', allCustomers);
+        });
+        
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#search_customer, #customer_list').length && 
+                !$(e.target).is('input[type="checkbox"]') && 
+                !$(e.target).is('label')) {
+                toggleList('customer_list', false);
+            }
+        });
+        
+        $('#search_training_group').on('focus', function() {
+            toggleList('training_group_list', true);
+        }).on('input', function() {
+            filterOptions('search_training_group', 'training_group_list', 'training_group_options', allTrainingGroups);
+        });
+        
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#search_training_group, #training_group_list').length && 
+                !$(e.target).is('input[type="checkbox"]') && 
+                !$(e.target).is('label')) {
+                toggleList('training_group_list', false);
+            }
+        });
+        
+        $('#search_program').on('focus', function() {
+            toggleList('program_list', true);
+        }).on('input', function() {
+            filterOptions('search_program', 'program_list', 'program_options', allPrograms);
+        });
+        
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#search_program, #program_list').length && 
+                !$(e.target).is('input[type="checkbox"]') && 
+                !$(e.target).is('label')) {
+                toggleList('program_list', false);
+            }
+        });
+        
+        $('#search_program_scenario').on('focus', function() {
+            toggleList('program_scenario_list', true);
+        }).on('input', function() {
+            filterOptions('search_program_scenario', 'program_scenario_list', 'program_scenario_options', allProgramScenarios);
+        });
+        
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#search_program_scenario, #program_scenario_list').length && 
+                !$(e.target).is('input[type="checkbox"]') && 
+                !$(e.target).is('label')) {
+                toggleList('program_scenario_list', false);
+            }
+        });
+    }
+    
+    function loadFilterData() {
+        $.ajax({
+            url: filtersUrl,
+            data: {
+                customer_id: selectedCustomers,
+                program_id: selectedPrograms
+            },
+            traditional: true,
+            success: function(response) {
+                allCustomers = response.customers || [];
+                allTrainingGroups = response.training_groups || [];
+                allPrograms = response.programs || [];
+                allProgramScenarios = response.program_scenarios || [];
+                
+                populateList('customer_options', allCustomers, selectedCustomers, function(values) {
+                    updateFilterDisplay('customer', selectedCustomers, allCustomers);
+                    reloadFiltersAfterCustomerChange();
+                }, 'customer');
+                
+                populateList('training_group_options', allTrainingGroups, selectedTrainingGroups, function(values) {
+                    updateFilterDisplay('training_group', selectedTrainingGroups, allTrainingGroups);
+                    loadReport();
+                }, 'training_group');
+                
+                populateList('program_options', allPrograms, selectedPrograms, function(values) {
+                    updateFilterDisplay('program', selectedPrograms, allPrograms);
+                    reloadFiltersAfterProgramChange();
+                }, 'program');
+                
+                populateList('program_scenario_options', allProgramScenarios, selectedProgramScenarios, function(values) {
+                    updateFilterDisplay('program_scenario', selectedProgramScenarios, allProgramScenarios);
+                    loadReport();
+                }, 'program_scenario');
+            },
+            error: function() {
+                console.error('Filtre verileri yüklenirken hata oluştu');
+            }
+        });
+    }
+    
+    function reloadFiltersAfterCustomerChange() {
+        selectedPrograms.length = 0;
+        selectedTrainingGroups.length = 0;
+        selectedProgramScenarios.length = 0;
+        
+        $.ajax({
+            url: filtersUrl,
+            data: {
+                customer_id: selectedCustomers,
+                program_id: []
+            },
+            traditional: true,
+            success: function(response) {
+                allTrainingGroups = response.training_groups || [];
+                allPrograms = response.programs || [];
+                allProgramScenarios = response.program_scenarios || [];
+                
+                populateList('training_group_options', allTrainingGroups, selectedTrainingGroups, function(values) {
+                    updateFilterDisplay('training_group', selectedTrainingGroups, allTrainingGroups);
+                    loadReport();
+                }, 'training_group');
+                
+                populateList('program_options', allPrograms, selectedPrograms, function(values) {
+                    updateFilterDisplay('program', selectedPrograms, allPrograms);
+                    reloadFiltersAfterProgramChange();
+                }, 'program');
+                
+                populateList('program_scenario_options', allProgramScenarios, selectedProgramScenarios, function(values) {
+                    updateFilterDisplay('program_scenario', selectedProgramScenarios, allProgramScenarios);
+                    loadReport();
+                }, 'program_scenario');
+                
+                loadReport();
+            },
+            error: function() {
+                console.error('Filtre verileri yüklenirken hata oluştu');
+            }
+        });
+    }
+    
+    function reloadFiltersAfterProgramChange() {
+        selectedProgramScenarios.length = 0;
+        
+        $.ajax({
+            url: filtersUrl,
+            data: {
+                customer_id: selectedCustomers,
+                program_id: selectedPrograms
+            },
+            traditional: true,
+            success: function(response) {
+                allProgramScenarios = response.program_scenarios || [];
+                
+                populateList('program_scenario_options', allProgramScenarios, selectedProgramScenarios, function(values) {
+                    updateFilterDisplay('program_scenario', selectedProgramScenarios, allProgramScenarios);
+                    loadReport();
+                }, 'program_scenario');
+                
+                loadReport();
+            },
+            error: function() {
+                console.error('Filtre verileri yüklenirken hata oluştu');
+            }
+        });
+    }
+    
+    function updateFilterDisplay(filterType, selectedValues, dataArray) {
+        const searchInputId = 'search_' + filterType;
+        const $input = $('#' + searchInputId);
+        
+        if (selectedValues.length === 0) {
+            $input.val('');
+        } else if (selectedValues.length === dataArray.length) {
+            $input.val('Tümü seçildi (' + selectedValues.length + ')');
+        } else if (selectedValues.length === 1) {
+            const item = dataArray.find(i => String(i.id) === selectedValues[0]);
+            $input.val(item ? item.name : '');
+        } else {
+            $input.val(selectedValues.length + ' öğe seçildi');
+        }
+    }
+    
+    function loadReport() {
+        if (selectedCustomers.length === 0 && selectedTrainingGroups.length === 0 && selectedPrograms.length === 0 && selectedProgramScenarios.length === 0) {
+            $('#customer_report_container').html('<p>Filtre seçerek raporu görüntüleyin.</p>');
+            return;
+        }
+        
+        $('#customer_report_container').html('<p class="loading">Yükleniyor...</p>');
+        
+        const data = {};
+        
+        if (selectedCustomers.length > 0) {
+            data.customer = selectedCustomers;
+        }
+        if (selectedTrainingGroups.length > 0) {
+            data.training_group = selectedTrainingGroups;
+        }
+        if (selectedPrograms.length > 0) {
+            data.program = selectedPrograms;
+        }
+        if (selectedProgramScenarios.length > 0) {
+            data.program_scenario = selectedProgramScenarios;
+        }
+        
+        $.ajax({
+            url: reportUrl,
+            data: data,
+            traditional: true,
+            success: function(response) {
+                renderReport(response);
+            },
+            error: function() {
+                $('#customer_report_container').html('<p class="error">Rapor yüklenirken bir hata oluştu.</p>');
+            }
+        });
+    }
+    
+    function renderReport(response) {
+        if (!response.report_data || response.report_data.length === 0) {
+            $('#customer_report_container').html('<p>Seçilen filtreler için veri bulunamadı.</p>');
+            return;
+        }
+        
+        let rows = '';
+        response.report_data.forEach(function(item) {
+            const improvement = item.improvement_avg_percentage !== null 
+                ? `<span class="${item.improvement_avg_percentage >= 0 ? 'improvement-positive' : 'improvement-negative'}">
+                    ${item.improvement_avg_percentage >= 0 ? '▲' : '▼'} ${item.improvement_avg_percentage}%
+                   </span>`
+                : '-';
+            
+            rows += `
+                <tr>
+                    <td>${item.scenario_name}</td>
+                    <td>${item.program_name}</td>
+                    <td>${item.trainers || '—'}</td>
+                    <td style="font-variant-numeric: tabular-nums;">${item.release_date}</td>
+                    <td>${item.pre_completed}/${item.total_users}</td>
+                    <td>${item.pre_avg}</td>
+                    <td>${item.pre_attempt_avg.toFixed(2)}</td>
+                    <td>${item.post_completed}/${item.total_users}</td>
+                    <td>${item.post_avg}</td>
+                    <td>${item.post_attempt_avg.toFixed(2)}</td>
+                    <td>${improvement}</td>
+                </tr>
+            `;
+        });
+        
+        const html = `
+            <div class="report-table-wrapper">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" style="vertical-align: middle;">Senaryo</th>
+                            <th rowspan="2" style="vertical-align: middle;">Program</th>
+                            <th rowspan="2" style="vertical-align: middle;">Eğitmenler</th>
+                            <th rowspan="2" style="vertical-align: middle; font-variant-numeric: tabular-nums;">Yayın Tarihi</th>
+                            <th colspan="3">Ön Değerlendirme</th>
+                            <th colspan="3">Son Değerlendirme</th>
+                            <th rowspan="2" style="vertical-align: middle;">Gelişim (%)</th>
+                        </tr>
+                        <tr class="secondary">
+                            <th>Tamamlanma</th>
+                            <th>Ort.Puan</th>
+                            <th>Ort.Deneme</th>
+                            <th>Tamamlanma</th>
+                            <th>Ort.Puan</th>
+                            <th>Ort.Deneme</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        $('#customer_report_container').html(html);
+    }
+    
+    function exportReport() {
+        const exportUrl = $reportSection.data('export-url');
+        if (!exportUrl) return;
+        
+        const params = new URLSearchParams();
+        selectedCustomers.forEach(id => params.append('customer', id));
+        selectedTrainingGroups.forEach(id => params.append('training_group', id));
+        selectedPrograms.forEach(id => params.append('program', id));
+        selectedProgramScenarios.forEach(id => params.append('program_scenario', id));
+        
+        const finalUrl = params.toString() ? `${exportUrl}?${params.toString()}` : exportUrl;
+        window.location.href = finalUrl;
+    }
+    
+    $(document).ready(function() {
+        $('#export-xlsx').on('click', function() {
+            exportReport();
+        });
+        initializeFilters();
+        loadFilterData();
+    });
+})(typeof django !== 'undefined' && django.jQuery ? django.jQuery : jQuery);
+</script>
+{% endblock %}

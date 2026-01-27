@@ -1,0 +1,22 @@
+Merhaba {{ user.get_full_name|default:user.username }},
+
+SimAct sistemi üzerinden {{ training_group_name }} eğitim grubuna yeni bir senaryo eklendi.
+
+Program: {{ program_name }}
+
+Yeni Senaryo: {{ scenario_name }}
+{% if release_date %}
+Yayın Tarihi: {{ release_date|date:"d.m.Y" }}
+{% endif %}{% if training_date %}
+Eğitim Tarihi: {{ training_date|date:"d.m.Y" }}
+{% endif %}{% if close_date %}
+Kapanış Tarihi: {{ close_date|date:"d.m.Y" }}
+{% endif %}
+
+Giriş Adresiniz: https://dalecarnegie.com.tr/simact/giris/
+
+Herhangi bir sorunuz olursa bize ulaşmaktan çekinmeyin.
+İyi çalışmalar!
+
+DaleCarnegie Ekibi
+

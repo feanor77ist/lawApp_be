@@ -1,0 +1,59 @@
+{% load i18n %}
+
+<style>
+.customer-filter-wrapper {
+    margin: 0 0 0.5em 0;
+}
+
+.customer-filter-wrapper input[type="text"] {
+    width: 92%;
+    padding: 4px 6px;
+    font-size: 13px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    background-color: #fff;
+    color: #000;
+    margin-left: 8px;
+    margin-bottom: 2px;
+}
+
+[data-theme="dark"] .customer-filter-wrapper input[type="text"] {
+    background-color: #1e1e1e !important;
+    border-color: #555 !important;
+    color: #eee !important;
+}
+
+#customer-filter-list {
+    max-height: 150px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+</style>
+
+<div class="customer-filter-wrapper">
+    <input type="text"
+           id="customer-filter-search"
+           placeholder="Müşteri ara..."
+           onkeyup="filterCustomerOptions()"
+           class="vTextField" />
+</div>
+
+<ul id="customer-filter-list" class="admin-filter-list">
+{% for choice in choices %}
+    <li><a href="{{ choice.query_string }}" {% if choice.selected %}class="selected"{% endif %}>{{ choice.display }}</a></li>
+{% endfor %}
+</ul>
+
+<script>
+function filterCustomerOptions() {
+    const input = document.getElementById("customer-filter-search");
+    const filter = input.value.toLowerCase();
+    const items = document.querySelectorAll("#customer-filter-list li");
+
+    items.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(filter) ? "" : "none";
+    });
+}
+</script>

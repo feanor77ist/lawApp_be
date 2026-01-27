@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Değerlendirme Raporu - {{ report.id }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            border-bottom: 3px solid #417690;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #417690;
+            margin: 0;
+            font-size: 24pt;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            background-color: #f8f9fa;
+        }
+        .info-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        .info-table td:first-child {
+            font-weight: bold;
+            width: 200px;
+            background-color: #e9ecef;
+        }
+        .content {
+            margin-top: 30px;
+        }
+        .content h2 {
+            color: #417690;
+            border-bottom: 2px solid #417690;
+            padding-bottom: 5px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            color: #417690;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        .markdown-content h1 { font-size: 18pt; }
+        .markdown-content h2 { font-size: 16pt; }
+        .markdown-content h3 { font-size: 14pt; }
+        .markdown-content p {
+            margin-bottom: 1em;
+        }
+        .markdown-content ul,
+        .markdown-content ol {
+            margin-left: 2em;
+            margin-bottom: 1em;
+        }
+        .markdown-content li {
+            margin-bottom: 0.5em;
+        }
+        .markdown-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+            font-size: 10pt;
+        }
+        .markdown-content table th,
+        .markdown-content table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .markdown-content table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        .markdown-content code {
+            background-color: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 10pt;
+        }
+        .markdown-content pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border-left: 4px solid #417690;
+            font-size: 10pt;
+        }
+        .markdown-content pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        .markdown-content blockquote {
+            border-left: 4px solid #417690;
+            padding-left: 1em;
+            margin-left: 0;
+            color: #666;
+            font-style: italic;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            font-size: 10pt;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Değerlendirme Raporu</h1>
+    </div>
+
+    <table class="info-table">
+        <tr>
+            <td>Kullanıcı:</td>
+            <td>{{ report.user.get_full_name|default:report.user.username }}</td>
+        </tr>
+        <tr>
+            <td>Eğitim Grubu:</td>
+            <td>{{ report.training_group.name }}</td>
+        </tr>
+        <tr>
+            <td>Senaryo:</td>
+            <td>{{ report.scenario.name }}</td>
+        </tr>
+        <tr>
+            <td>Değerlendirme Türü:</td>
+            <td>{{ report.get_type_display }}</td>
+        </tr>
+        <tr>
+            <td>Puan:</td>
+            <td style="font-size: 16pt; font-weight: bold; color: #417690;">{{ report.score }}</td>
+        </tr>
+        <tr>
+            <td>Deneme Sayısı:</td>
+            <td>{{ report.attempt_count }}</td>
+        </tr>
+        <tr>
+            <td>Tarih:</td>
+            <td>{{ report.created_at|date:"d.m.Y H:i" }}</td>
+        </tr>
+    </table>
+
+    <div class="content">
+        <h2>Rapor İçeriği</h2>
+        <div class="markdown-content">
+            {{ html_content|safe }}
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Bu rapor {{ report.created_at|date:"d.m.Y H:i" }} tarihinde oluşturulmuştur.</p>
+    </div>
+</body>
+</html>
+

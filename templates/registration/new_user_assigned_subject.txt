@@ -1,0 +1,2 @@
+[Dale Carnegie Akademi] {{ training_group_name }} Eğitim Grubuna Eklendiniz
+
