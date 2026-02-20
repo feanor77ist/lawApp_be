@@ -1,6 +1,6 @@
 from django.urls import path
-from .consumers import ChatConsumer
+from .consumers import RAGStreamConsumer
 
 websocket_urlpatterns = [
-    path('ws/chat/<str:entry_id>/', ChatConsumer.as_asgi()),
+    path("ws/rag/<int:session_id>/", RAGStreamConsumer.as_asgi()),
 ]

@@ -1,314 +1,492 @@
-# ML Simulator
+# AI Destekli Hukuki Asistan Uygulaması — Tasarım / Teknik Spesifikasyon
 
-Kurumsal eğitim senaryolarını gerçekçi diyaloglarla deneyimletmek ve performansını ölçmek için geliştirilmiş Django tabanlı bir platform. REST API, WebSocket (Django Channels) ve LLM tabanlı chatbot bileşeniyle uçtan uca eğitim simülasyonu sağlar.
+Bu doküman; hukuk profesyonellerine (avukat, hukuk müşaviri vb.) yönelik **bireysel asistan** işlevleri sunan web uygulamasının hedeflerini, veri modelini ve ana modüllerini tanımlar.
 
----
-
-## İçindekiler
-
-1. [Teknoloji Yığını](#teknoloji-yığını)
-2. [Genel Mimarî](#genel-mimarî)
-3. [Uygulama Bileşenleri](#uygulama-bileşenleri)
-4. [Veri Modeli](#veri-modeli)
-5. [Chatbot Diyalog Akışı](#chatbot-diyalog-akışı)
-6. [REST API Uçları](#rest-api-uçları)
-7. [Kurulum ve Çalıştırma](#kurulum-ve-çalıştırma)
-8. [Yönetim Paneli](#yönetim-paneli)
-9. [Geliştirme / Test Notları](#geliştirme--test-notları)
+> **Not:** Uygulama tekil kullanıcı bazlıdır (multi-tenant değil). Her kullanıcı kendi verilerine erişir.
 
 ---
 
-## Teknoloji Yığını
+## 1) Amaç ve Kapsam
 
-- **Backend:** Django 4.2, Django REST Framework
-- **Gerçek Zamanlı:** Django Channels + Redis (Upstash)
-- **LLM / RAG:** LangChain, LangGraph, OpenAI API (GPT-4.1 mini, gpt-4o-mini-tts)
-- **Veritabanı:** PostgreSQL
-- **Önbellekleme:** Redis
-- **Depolama:** Django `FileField`/`ImageField` + `documents/` klasörü
-- **İletişim:** Token tabanlı kimlik doğrulama, CSRF uyumlu cookie ayarları
-- **Dağıtım:** ASGI (uvicorn / gunicorn), Whitenoise ile statik dosya servisleri
-- **İstemci yönlendirme:** Backend ana URL’si Vue/React türü frontend’e (`ml-simulator-fe.vercel.app` / `localhost:3000`) yönlendirir.
+Uygulama, kullanıcıların:
+- **Karar/İçtihat veritabanı** üzerinden arama & sohbet (retrieval + RAG)
+- **Kendi dokümanlarını** yükleyip (sözleşme, dilekçe, pdf/word vb.) arama & sohbet
+- **Dava dosyası (case) yönetimi** + **masraf/avans takibi**
+- **Takvim / bildirim** entegrasyonları
+- (Opsiyonel) **UYAP / E-Tebligat** süreç otomasyonları
+
+yapabileceği bir çalışma ortamı sunar.
 
 ---
 
-## Genel Mimarî
+## 2) Sistem Mimarisi
+
+### 2.1 Mimari Diyagram
 
 ```
-+----------------+      REST / Token     +--------------------------+
-|   Frontend     | <-------------------> | Django REST API (my_app) |
-| (Next.js vb.)  |                       +--------------------------+
-|                | WebSocket / token     | ChatbotAPI & ViewSets    |
-|                | <-------------------> |                          |
-+----------------+                       |                          |
-                                         | Channels (ASGI)          |
-                                         +------------+-------------+
-                                                      |
-                                                      v
-                                         +--------------------------+
-                                         | ChatConsumer (WebSocket) |
-                                         | LangGraph Chatbot        |
-                                         +------------+-------------+
-                                                      |
-                                     Senaryo & KPI    v
-                                 +--------------------------+
-                                 | PostgreSQL (models.py)   |
-                                 |  + documents/ dosyaları  |
-                                 +--------------------------+
-                                                      |
-                                                      v
-                                 +--------------------------+
-                                 | Redis (Channel layer)    |
-                                 +--------------------------+
+┌─────────────────────────────────────────────────────────────────┐
+│                        Render Cloud                             │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐            │
+│  │ Django API  │   │   Celery    │   │    Redis    │            │
+│  │  (Web Svc)  │   │  (Worker)   │   │  (Queue)    │            │
+│  └──────┬──────┘   └──────┬──────┘   └─────────────┘            │
+│         │                 │                                     │
+│         ▼                 ▼                                     │
+│  ┌─────────────────────────────────────────────────────┐        │
+│  │           Render PostgreSQL (Ana DB)                │        │
+│  │  User, CaseFile, Expense, Document (metadata)       │        │
+│  └─────────────────────────────────────────────────────┘        │
+└─────────────────────────────────────────────────────────────────┘
+         │                        │
+         ▼                        ▼
+┌─────────────────┐      ┌─────────────────────────┐
+│  Cloudflare R2  │      │      Qdrant Db (Hetzner Server)       │
+│  ───────────────│      │   ─────────────────────  │
+│  - karar .txt   │      │   - decisions collection │
+│  - user docs    │      │   - user_docs collection │
+│  - JSON metadata│      │   - HNSW + cosine        │
+└─────────────────┘      └─────────────────────────┘
 ```
+
+### 2.2 Depolama Seçimleri
+
+| Bileşen | Teknoloji | Açıklama |
+|---------|-----------|----------|
+| **Object Storage** | Cloudflare R2 | Karar dosyaları (.txt), kullanıcı dokümanları, metadata JSON |
+| **Vector Store** | Qdrant Cloud | Embedding'ler (1536 dim), HNSW index, cosine similarity |
+| **Ana Veritabanı** | Render PostgreSQL | User, CaseFile, Expense, Document metadata |
+| **Cache/Queue** | Redis | Celery task queue, session cache |
+
+### 2.3 Uygulama Servisleri
+
+| Servis | Teknoloji | Açıklama |
+|--------|-----------|----------|
+| Backend API | Django + DRF | ASGI/Uvicorn, REST endpoints |
+| Worker | Celery | Async jobs: embedding, indexleme, bildirim |
+| LLM Orkestrasyon | LangChain / LangGraph | RAG pipeline, agent flows |
+| Deploy | Render Cloud | Web service, Postgres, Redis, Worker |
+
+### 2.4 Embedding Stratejisi
+
+| Parametre | Değer |
+|-----------|-------|
+| **Model** | OpenAI `text-embedding-3-small` |
+| **Boyut** | 1536 dim |
+| **Yöntem** | OpenAI Batch API |
+| **Maliyet** | $0.01 / 1M token (batch fiyatı) |
+| **Similarity** | Cosine |
+
+> **Neden 1536 dim?** Hukuki metinlerde kavram nüansları, istisnalar ve benzer olaylar için yüksek temsil kapasitesi gerekir. 1536 dim ile daha iyi recall elde edilir.
 
 ---
 
-## Uygulama Bileşenleri
+## 3) Ana İşlevler
 
-### `chatbot/`
-- `chatbot.py`: LangGraph ile rol oynama (RAG) ve değerlendirme düğümlerini yöneten akış.
-  - `rag_chain`: Senaryo bağlamını kullanarak karakter yanıtı üretir.
-  - `evaluation_node`: Sohbet kapanırken KPI bazlı değerlendirme raporu üretir, JSON şemasını pydantic ile doğrular.
-- `context_utils.py`: Senaryo dokümanlarını (PDF/DOCX) okuyup LangChain `HumanMessage`/`AIMessage` listesi kurar.
-- `llm_utils.py`: Kullanılan model kimlikleri (LLM ve embedding).
-- `Chatbot` sınıfı:
-  - OpenAI Chat modeli için streaming yanıt.
-  - Yapay zekâ değerlendirmesi sırasında JSON üretimi ve fallback mekanizması.
-  - KPI raporundan `Toplam Puan` hesaplayıp rapor metnini biçimlendirir.
+### 3.1 Karar Sorgulama & Asistan Sohbet
+- Retrieval: karar metinleri + metadata filtreleme
+- RAG: ilgili chunk'lar ile cevap üretimi
+- Agents: (opsiyonel) task bazlı akışlar (özet, karşı argüman, emsal bulma, timeline çıkarma)
 
-### `my_app/`
-- **`models.py`**: Eğitim kurgusunun çekirdeği.
-  - `Customer`, `Program` ve `Scenario` ilişkileri.
-  - `ProgramScenario`: Ağırlık yüzdesi, yayın/eğitim/kapanış tarihleri ve maksimum deneme sayısı.
-  - `TrainingGroup` / `GroupUser`: Katılımcı ilerleme ve toplam skor takibi.
-  - `UserEntry`, `UserChatHistory`: Chat oturumu ve mesaj kayıtları.
-  - `EvaluationReport`: KPI değerlendirme raporları (pre/post).
-- **`views.py`**:
-  - ViewSet’ler (Scenario, Customer, Program, Group, GroupUser, ProgramScenario, EvaluationReport).
-  - `CustomAuthToken`: E-posta/şifre ile login, token üretimi, müşteri logosu.
-  - `UserEntryListAPI`: Kullanıcının entry ve chat geçmişini listeler.
-  - `ChatbotAPI`: Yeni sohbet oturumu (entry) açar.
-  - `available_scenarios_api`: Yayın ve eğitim tarihine göre aktif/yaklaşan senaryoları hesaplar, deneme hakkı kontrolü yapar.
-  - `TextToSpeechAPIView`: Senaryonun TTS ses profilini kullanarak OpenAI TTS API’sinden ses dosyası döndürür.
-  - `get_csrf_token`: Safari özelinde cookie ayarlamaları.
-- **`consumers.py`** (`ChatConsumer`):
-  - Token doğrulamasıyla WebSocket bağlantısı açar (`ws/chat/<entry_id>/?token=...`).
-  - Mesajları LangGraph chatbot’a aktarır, streaming yanıtları client’a gönderir.
-  - Değerlendirme tamamlanınca `EvaluationReport` kaydeder, entry’yi kilitler (`is_locked`).
-  - `UserChatHistory` kayıtlarını günceller, `created_at` zaman damgasını yeniler.
-- **`serializers.py`**: DRF modeli serializer’ları; entry için scenario adı ve arka plan görseli URI’si üretir.
-- **`signals.py`**:
-  - `EvaluationReport` sonrası `GroupUser`/`TrainingGroup` progress hesapları ve ağırlıklı ortalama skor.
-  - `ProgramScenario` güncellemelerinde ilgili tüm progress hesaplarını yeniden yapar.
-  - `User` kayıtlarında e-posta normalizasyonu ve benzersizlik kontrolleri.
-  - Yeni kullanıcılar için otomatik parola sıfırlama e-postası (`registration/welcome_email.html`).
-- **`admin.py`**:
-  - Gelişmiş admin arayüzleri, filtreler ve inline bileşenler.
-  - Program senaryosu ağırlık toplamını doğrulayan formset.
-  - Katılımcı ilerleme çubukları, pre/post rapor linkleri, gelişim yüzdesi hesapları.
-  - Excel dışa aktarım, müşteri kullanıcıları için özel seçim widget’ları.
-- **`routing.py`**: WebSocket endpoint’i (`ws/chat/<entry_id>/`).
+### 3.1.1 Dilekçe Üretimi / Oluşturma
+- Kullanıcı, ilgili dava dosyası veya doküman üstünde chatSession başlatır.
+- Chat akışı, RAG + şablonlama ile dilekçe taslağı üretir.
+- Kullanıcı düzenleyip indirebilir (PDF/Word).
 
-### `ml_simulator/`
-- `settings.py`: ortam değişkenleri, CORS/CSRF, Channels, Redis ve e-posta yapılandırması.
-- `urls.py`: Kök URL’yi frontend’e yönlendirir, `/admin/`, `/api/`, parola sıfırlama yolları.
-- `asgi.py`: Channels `ProtocolTypeRouter` yapılandırması (HTTP + WebSocket).
+### 3.2 Kullanıcı Dokümanı Yükleme & Indexleme
+- `Document` kaydı `created_by` ile kullanıcıya bağlanır
+- Dosya yüklenir (R2)
+- Metin çıkarımı (pdf/word → text)
+- Chunking (örn: 1000 token hedef, overlap 200)
+- Embedding → Qdrant'a yazma
+- Bu süreç **async job** olmalı (Celery)
 
-### Diğer dizinler
-- `documents/`: Senaryo ve değerlendirme dokümanları + müşteri logoları ve arka plan görselleri.
-- `templates/`: Admin ve e-posta şablonları (`registration/`).
-- `static/`: Admin, rest_framework ve üçüncü parti paketlerin statik dosyaları.
-- `requirements.txt`: Tam bağımlılık listesi (LangChain ekosistemi, celery vb.).
+> Not: Signals / `post_save` ile tetikleme opsiyonu var; pratikte "upload sonrası job enqueue" daha kontrollü.
+
+### 3.3 Takvim / Bildirim Entegrasyonu
+- Google Calendar entegrasyonu veya agentic node'lar
+- Notification işleri (deadline yaklaşıyor, duruşma tarihi, yapılacaklar)
+
+### 3.4 Dava Dosyası CRUD + Takvim Entegrasyonu + Muhasebe
+- Dava dosyası kaydı (müvekkil, karşı taraf, esas/karar no, konu, durum)
+- Masraf/avans kayıtları (ofis ödedi mi, müvekkile yansıtılacak mı?)
+- Bakiye hesaplama: devreden + avans - iade - harcama
+
+### 3.5 (Opsiyonel) UYAP / E-Tebligat Entegrasyonu
+- Duruşma/tebligat takibi → otomatik görevler (dosya bazlı checklist)
+- Süre hesaplayıcı (HMK/İYUK/CMK farkları, resmi tatil/hafta sonu)
+- Hatırlatma + taslak hazırlık akışları
+
+### 3.6 (Opsiyonel) Dönüşüm Paneli
+- UDF / Word / PDF dönüşüm paneli (gömülü araç veya servis)
+
+### 3.7 Sözleşme İnceleme
+- Doküman upload ederek RAG chain çalıştırma (risk maddeleri, eksik hükümler, özet, öneri)
+
+### 3.8 Agentic İşlevler (LangFlow)
+- Google Calendar entegrasyonu, URL agent vb. akışlar LangFlow üzerinde tanımlanır.
+- Backend, LangFlow API’leri üzerinden bu agentic akışları tetikler.
 
 ---
 
-## Veri Modeli
+## 4) Veri Modeli (DB Şeması)
 
-| Model | Görev | Önemli Alanlar |
-| --- | --- | --- |
-| `Customer` | Kurumsal müşteri yönetimi | `users` ManyToMany, logo dosyası silme logikleri |
-| `Program` | Eğitim programı | `scenarios` through `ProgramScenario` |
-| `ProgramScenario` | Program-senaryo bağlantısı | `weight_percentage`, `release_date`, `training_date`, `close_date`, `max_attempts` |
-| `Scenario` | Simülasyon senaryosu | `scenario_document`, `review_document`, `bg_image`, `ai_level`, `voice` |
-| `TrainingGroup` | Müşteri bazlı eğitim grubu | `program`, `customer`, `users` (`GroupUser` üzerinden), `progress` |
-| `GroupUser` | Katılımcı-grup ilişkisi | `progress`, `total_score` (ağırlıklı ortalama) |
-| `UserEntry` | Chat oturumu | `entry_id`, `is_locked`, `training_group` |
-| `UserChatHistory` | Mesaj geçmişi | `user_query`, `gpt_response`, kronolojik sıralama |
-| `EvaluationReport` | KPI değerlendirmesi | `score`, `type` (pre/post), `attempt_count`, rapor texti |
+Aşağıdaki modeller; `dava-masraf_tables.xlsx` içeriği ve tasarım dokümanına göre önerilen minimum çekirdektir.
 
-**Sinyaller:**
+### 4.1 User
+- Django `AbstractUser` veya `AbstractBaseUser` extend
+- Tekil kullanıcı bazlı sistem (multi-tenant yok)
 
-- `update_progress`: Post-evaluation rapor sonrası ilerleme ve ortalama güncelleme.
-- `handle_program_scenario_change`: Program senaryoları değişince tüm katılımcıları yeniden hesaplar.
-- `normalize_user_email`: Case-insensitive benzersizlik, username/email eşitlemesi.
-- `send_password_reset_email`: Yeni kullanıcıya, environment’a uygun domain ile parola sıfırlama e-postası.
+### 4.2 CaseFile (Dava Dosyası)
+XLSX sayfa: `Dosya-kaydı(case)` örneğine göre alanlar:
 
----
+- `case_id` (UUID) — örn: `CASE-0001`
+- `dosya_kodu` (string, opsiyonel) — ofis içi takip
+- `dosya_adi` (string)
+- `dosya_turu` (enum) — örn: `DAVA`
+- `yargi_mercii` / `birim_adi` (string) — örn: "İstanbul 10. İş Mahkemesi"
+- `esas_no` (string) — örn: `2026/123 E.`
+- `karar_no` (string, nullable)
+- `konu_ozeti` (text)
+- `durum` (enum) — `ACIK | KAPALI | ASKIDA`
+- `acilis_tarihi` (date)
+- `kapanis_tarihi` (date, nullable)
+- `muvekkil_ad_unvan` (string)
+- `karsi_taraf_ad_unvan` (string)
+- `para_birimi` (string, default `TRY`)
+- `devreden_bakiye` (decimal, default 0) — "önceki dönem" devri
 
-## Chatbot Diyalog Akışı
+**Güvenlik alanları**
+- `created_by` (FK User)
+- `created_at`, `updated_at`
 
-1. **Entry Oluşturma:** `/api/chatbot/` endpoint’i kullanıcı token’ı ile çağrılır, `TrainingGroup` kontrolü sonrası yeni `UserEntry` oluşturulur (UUID).
-2. **WebSocket Bağlantısı:** Frontend `ws://<host>/ws/chat/<entry_id>/?token=...` formatıyla bağlanır, token doğrulanır, kullanıcıya ait entry olup olmadığı kontrol edilir.
-3. **Diyalog:**  
-   - `rag_chain` node’u: Senaryo dokümanından alınan bağlamla rol yapar, her token stream edilir.  
-   - Sohbet geçmişi (`UserChatHistory`) 20 mesaja kadar senkronize edilir.
-4. **Değerlendirme (Farewell):** Kullanıcı “rapor ver”, “görüşürüz” vb. ifadeler kullanırsa `evaluation_node` tetiklenir.
-   - Pydantic şeması ile JSON KPI listesi alınır, skor doğrulamaları yapılır.
-   - Rapor metni oluşturulur, toplam puan hesaplanır.
-   - `EvaluationReport` kaydı yapılır, `attempt_count` güncellenir.
-   - Entry kilitlenir (`is_locked=True`), chat geçmişi kayıt altına alınır.
-5. **Yanıt Tamamlama:** WebSocket üzerinden `status=completed` mesajı ve rapor metni gönderilir.
+> Not: UYAP entegrasyonu varsa `esas_no` genelde benzersizdir; yine de ofis içi `dosya_kodu` ayrı tutulabilir.
 
----
+### 4.3 Expense (Masraf / Avans Kaydı)
+XLSX sayfa: `Masraf_kaydı(expence)` örneğine göre:
 
-## REST API Uçları
+- `expense_id` (UUID) — örn: `EXP-0001`
+- `case_id` (FK CaseFile)
+- `islem_tarihi` (date)
+- `islem_tipi` (enum)
+  - `MASRAF`
+  - `AVANS_ALINDI`
+  - `AVANS_IADE`
+- `kategori` (string) — masraf türü
+- `aciklama` (text)
+- `receipt_type` (enum, nullable)
+  - `BELGELI`
+  - `BELGESIZ`
+- `tutar` (decimal)
+- `para_birimi` (string, default `TRY`)
+- `odeme_yapan` (enum, nullable)
+  - `OFIS`
+  - `MUVEKKIL`
+- `muvekkile_yansit` (bool) — XLSX'te `E/H`
 
-| Method / Path | Açıklama | Not |
-| --- | --- | --- |
-| `POST /api/login/` | Token alma (email + şifre). `permissions` ve `customer_logo` döner. | `rest_framework.authtoken` |
-| `GET /api/entries/` | Kullanıcının tüm girişleri, sayfalı (`page_size=50`). | `UserEntrySerializer` |
-| `GET /api/entries/<entry_id>/` | Belirli entry + chat geçmişi. | |
-| `POST /api/chatbot/` | Yeni entry ID üretir. | `scenario` adı ve `group` ID parametreleri gerekir. |
-| `GET /api/user/scenarios/` | Aktif ve yaklaşan senaryolar. | Yayın/eğitim/kapanış tarihine göre alt segmentler, deneme takibi. |
-| `POST /api/tts/` | Metni senaryonun TTS sesiyle ses dosyasına çevirir. | `scenario_name`, `text` zorunlu. `__preview__voice` ile preview. |
-| `GET /api/auth/csrf/` | Safari uyumlu CSRF cookie üretir. | |
-| `ViewSet` uçları | `/api/scenario/`, `/api/customer/`, `/api/program/`, `/api/group/`, `/api/groupuser/`, `/api/programscenario/`, `/api/evaluationreport/` | DRF router ile CRUD |
+**Güvenlik**
+- `created_by` (FK User)
+- `created_at`, `updated_at`
 
-**Kimlik Doğrulama:** `Token` header veya Session auth. WebSocket’te token query paramı.
+### 4.4 Masraf Türü Sözlüğü (ExpenseCategory) — opsiyonel ama önerilir
+XLSX sayfa: `Masraf_Kategorileri`
 
----
+Başlangıç listesi:
+- Harç
+- Tebligat / Posta (PTT, UETS)
+- Bilirkişi / Keşif
+- Tanık / Yolluk
+- İcra Giderleri (dosya, haciz, satış vb.)
+- (İhtiyaca göre genişler)
 
-## Kurulum ve Çalıştırma
+Alanlar:
+- `id` (UUID)
+- `name` (unique)
+- `is_active` (bool)
 
-### Ön koşullar
-- Python 3.10
-- PostgreSQL & Redis (örn. Upstash)
-- OpenAI API anahtarı
-- Sanal ortam (`env/`)
+### 4.5 Document (Kullanıcı Dokümanı)
+- `document_id` (UUID)
+- `created_by` (FK User)
+- `case` (FK CaseFile, nullable) — doküman bir dosyaya bağlanabilir
+- `title`
+- `file_url` (R2 path)
+- `file_type` (pdf/docx/txt)
+- `text_extracted` (bool)
+- `indexed` (bool)
+- `metadata` (JSON) — sayfa sayısı, kaynak, etiketler vs.
+- timestamps
 
-### 1. Ortam Değişkenleri
-
-`.env` içinde en az şu değerler bulunmalı:
-
-```
-SECRET_KEY=...
-DEBUG=True
-OPENAI_API_KEY=...
-DB_NAME=...
-DB_USER=...
-DB_PASSWORD=...
-DB_HOST=...
-DB_PORT=...
-UPSTASH_REDIS_URL=...
-EMAIL_HOST_PASSWORD=...
-```
-
-Prod ortamında `DEBUG=False`, `MEDIA_ROOT`, `ALLOWED_HOSTS`, `CSRF_COOKIE_SECURE` gibi ayarlar otomatik uyarlanır.
-
-### 2. Bağımlılıklar
-
-```bash
-python -m venv env
-source env/bin/activate
-pip install -r requirements.txt
-```
-
-### 3. Veritabanı ve Statikler
-
-```bash
-python manage.py migrate
-python manage.py collectstatic --noinput
-```
-
-Gerekirse superuser oluştur:
-
-```bash
-python manage.py createsuperuser
-```
-
-### 4. Sunucu Çalıştırma
-
-**Geliştirme (Channels gereksinimi yoksa):**
-
-```bash
-python manage.py runserver 0.0.0.0:8000
-```
-
-**ASGI + Channels (önerilen):**
-
-```bash
-uvicorn ml_simulator.asgi:application --host 127.0.0.1 --port 8000 --log-level debug --reload
-```
-
-Log seviyeleri: `debug`, `info`, `warning`, `error`, `critical`.
-
-**Prod örneği (gunicorn + uvicorn worker):**
-
-```bash
-gunicorn ml_simulator.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --log-level warning
-```
+> **Not:** Vektör verileri Qdrant'ta tutulur. PostgreSQL'de `VectorRecord` tablosu gerekmez.
 
 ---
 
-## Yönetim Paneli
+## 5) Bakiye Hesaplama Mantığı (Masraf/Avans)
 
-- `/admin/` üzerinden erişim.
-- **ScenarioAdmin**: Senaryo listeleri, filtreler.
-- **CustomerAdmin**: Müşteri-kullanıcı eşleştirme, çakışma kontrolleri.
-- **TrainingGroup**:
-  - Inline `GroupUser` listeleri, ilerleme çubukları.
-  - Senaryo bazında pre/post rapor linkleri ve gelişim yüzdesi.
-  - Excel dışa aktarım düğmesi.
-- **ProgramScenario** Inline:
-  - Ağırlıkların toplamını 100 olacak şekilde doğrulayan formset.
-- **User Admin**:
-  - E-posta doğrulaması, case-insensitive benzersiz username/email.
-  - Yeni kullanıcıya otomatik parola sıfırlama maili.
+XLSX'teki örnek "BAKİYE HESAPLAMA" kısmına göre:
 
----
+**Formül:**
+`Bakiye = Devreden + Σ(AVANS_ALINDI) − Σ(AVANS_IADE) − Σ(MASRAF)`
 
-## Geliştirme / Test Notları
+Örnek (`CASE-0001`, 2026-02-28'e kadar):
+- Devreden: 1000
+- Alınan Avans: 3000
+- Avans İade: 500
+- Harcamalar Toplamı: 1444.90
+- Toplam Mevcut (Bakiye): 2055.10
 
-- **Veritabanı:** PostgreSQL bağlantısı zorunlu; `sqlite` desteği yok.
-- **Redis:** Channels + Caches için gereklidir.
-- **Senaryo Dokümanları:** `documents/` altındaki PDF/DOCX dosyaları LangChain ile okunur; prod ortamında dosyaların erişilebilir olup olmadığını doğrulayın.
-- **TTS:** OpenAI TTS (gpt-4o-mini-tts) kullanır; dosyalar `NamedTemporaryFile` ile geçici olarak oluşturulur.
-- **Deneme Takibi:** `EvaluationReport.attempt_count` ile pre/post denemeleri sınırlar (`ProgramScenario.max_attempts`).
-- **Test Önerileri:**
-  - Model ilişki testi (progress, total_score hesapları).
-  - WebSocket auth ve entry sahipliği kontrolleri.
-  - LangGraph akışının farewell tespiti (`check_farewell_node`).
-  - `available_scenarios_api` için tarih senaryoları (gelecek, aktif, kapanmış).
-  - Admin form validasyonları (program senaryo ağırlıkları, müşteri kullanıcı tahsisi).
-- **Enerji tüketimi:** LangChain/Embeddings için OpenAI API creditial’ları ve maliyet metriklerini takip edin.
+API seviyesinde öneri:
+- `GET /cases/{id}/balance?as_of=YYYY-MM-DD`
+  - DB'den `<= as_of` filtreli aggregate hesap
 
 ---
 
-## Hızlı Başlangıç
+## 6) API Taslağı (DRF)
 
-```bash
-# 1. Ortam kurulumu
-python -m venv env
-source env/bin/activate
-pip install -r requirements.txt
+### Auth
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me`
 
-# 2. .env ile yapılandırma
-cp .env.example .env  # (varsa) içerikleri doldurun
+### CaseFile
+- `GET /cases`
+- `POST /cases`
+- `GET /cases/{case_id}`
+- `PATCH /cases/{case_id}`
+- `DELETE /cases/{case_id}`
 
-# 3. DB + static
-python manage.py migrate
-python manage.py collectstatic --noinput
+### Expense
+- `GET /cases/{case_id}/expenses`
+- `POST /cases/{case_id}/expenses`
+- `PATCH /expenses/{expense_id}`
+- `DELETE /expenses/{expense_id}`
 
-# 4. Geliştirme sunucusu
-uvicorn ml_simulator.asgi:application --host 0.0.0.0 --port 8000 --reload
+### Balance
+- `GET /cases/{case_id}/balance?as_of=2026-02-28`
 
-# 5. Admin paneli
-open http://localhost:8000/admin/
+### Document
+- `POST /documents` (multipart upload)
+- `GET /documents`
+- `GET /documents/{document_id}`
+- `DELETE /documents/{document_id}`
+- `POST /documents/{document_id}/index` (enqueue job)
+
+### AI / Chat
+- `POST /chat`
+  - body: `{ mode: "decisions"|"user_docs"|"hybrid", query, filters, case_id? }`
+- `POST /decisions/search`
+- `POST /documents/search`
+
+---
+
+## 7) Embedding / Indexleme Pipeline
+
+### 7.1 Genel Parametreler
+
+| Parametre | Değer |
+|-----------|-------|
+| Chunking hedef | ~1000 token |
+| Overlap | ~200 token |
+| Embedding model | `text-embedding-3-small` |
+| Embedding boyut | 1536 |
+| API yöntemi | OpenAI Batch API |
+| Vector store | Qdrant Cloud |
+
+### 7.2 Qdrant Collection Şeması
+
+**`decisions` collection:**
+```json
+{
+  "vectors": {
+    "size": 1536,
+    "distance": "Cosine"
+  },
+  "payload_schema": {
+    "file_key": "keyword",
+    "daire": "keyword",
+    "tarih": "datetime",
+    "esas_no": "keyword",
+    "karar_no": "keyword",
+    "chunk_index": "integer"
+  }
+}
 ```
 
+**`user_docs` collection:**
+```json
+{
+  "vectors": {
+    "size": 1536,
+    "distance": "Cosine"
+  },
+  "payload_schema": {
+    "document_id": "keyword",
+    "user_id": "keyword",
+    "case_id": "keyword",
+    "chunk_index": "integer",
+    "title": "text"
+  }
+}
+```
+
+### 7.3 Karar Veritabanı Import (Batch Embedding)
+
+**Ölçek:**
+- ~12M karar dosyası
+- Ortalama ~10 KB/dosya (~3000-4000 token)
+- Chunking sonrası: ~48M chunk
+- Toplam token: ~48B
+
+**Maliyet tahmini:**
+- Batch API fiyatı: $0.01 / 1M token
+- Toplam: ~$480 (tek seferlik)
+
+**Süre:**
+- OpenAI Batch API SLA: 24 saat
+- Tipik tamamlanma: 4-12 saat
+
+**Pipeline adımları:**
+1. Karar dosyalarını R2'den oku
+2. Chunking yap (1000 token, 200 overlap)
+3. JSONL batch dosyaları hazırla (her biri max 50K request)
+4. OpenAI Batch API'ye yükle
+5. Tamamlanınca sonuçları indir
+6. Embedding'leri Qdrant'a upsert et
+7. Checkpoint tut (hata durumunda devam edebilmek için)
+
+**Örnek batch request formatı:**
+```json
+{
+  "custom_id": "decision-1234567890-chunk-0",
+  "method": "POST",
+  "url": "/v1/embeddings",
+  "body": {
+    "model": "text-embedding-3-small",
+    "input": "Karar metni chunk içeriği...",
+    "encoding_format": "float"
+  }
+}
+```
+
+### 7.4 Kullanıcı Dokümanı Indexleme (Real-time)
+
+Kullanıcı dokümanları için real-time API kullanılır (daha küçük ölçek):
+
+1. Doküman yüklenir → R2'ye kaydet
+2. Celery task tetiklenir
+3. Metin çıkarımı (pdfplumber / python-docx)
+4. Chunking
+5. OpenAI embedding API (real-time, küçük batch)
+6. Qdrant `user_docs` collection'a upsert
+7. Document.indexed = True
+
 ---
 
-Bu README, projenin tüm bileşenlerini ve mimarîsini kapsayacak şekilde düzenlendi.
+## 8) UI Modülleri (Minimum)
 
+- Dashboard
+  - Son dosyalar
+  - Yaklaşan duruşmalar / görevler (takvim entegrasyonu varsa)
 
+- Karar Arama + Chat
+  - Filtreler (daire, tarih aralığı, anahtar kelime)
+  - Sonuç listesi + seçili karar metni
+  - Chat paneli (kaynak gösterimi)
+
+- Dokümanlarım
+  - Upload
+  - Index durumları
+  - Doküman üstünde sohbet
+
+- Dava Dosyaları
+  - Liste
+  - Dosya detay (özet, taraflar, esas no)
+  - Masraf/Avans tablosu
+  - Bakiye kartı (as_of seçilebilir)
+
+- Masraf Türleri (admin)
+  - Kategori listesi
+
+---
+
+## 9) Yetkilendirme / Veri İzolasyonu
+
+- Tüm `CaseFile`, `Expense`, `Document` kayıtları `created_by` ile kullanıcıya aittir.
+- Queryset'ler her zaman `request.user` ile filtrelenmeli.
+- Qdrant sorguları `user_id` payload filtresi ile kısıtlanmalı.
+- Admin rolü varsa: kategori yönetimi, sistem ayarları.
+
+---
+
+## 10) Maliyet Tahmini (Aylık)
+
+| Bileşen | Plan | Maliyet |
+|---------|------|---------|
+| Render Web Service | Starter | ~$7 |
+| Render Postgres | Starter | ~$7 |
+| Render Redis | Free | $0 |
+| Render Worker | Starter | ~$7 |
+| Cloudflare R2 | 10GB free, sonra $0.015/GB | ~$0-15 |
+| Qdrant Cloud | Free (1GB) / Paid | $0-35 |
+| OpenAI API (chat) | Kullanıma göre | ~$10-50 |
+| **Toplam (başlangıç)** | | **~$30-120/ay** |
+
+**Tek seferlik maliyetler:**
+- Karar embedding: ~$480 (OpenAI Batch API)
+
+---
+
+## 11) Geliştirme Fazları
+
+### Faz 0: Altyapı Kurulumu
+- [x] Cloudflare R2 bucket oluştur
+- [ ] Qdrant Cloud hesabı aç, collection'lar oluştur
+- [ ] Render ortamı hazırla (web, postgres, redis, worker)
+- [ ] Env vars yapılandır
+
+### Faz 1: Karar Veritabanı Pipeline
+- [ ] Mevcut .txt dosyalarını R2'ye yükle
+- [ ] Batch embedding pipeline scripti yaz
+- [ ] Qdrant'a import et
+- [ ] Search API endpoint (`POST /decisions/search`)
+
+### Faz 2: Kullanıcı Doküman Modülü
+- [ ] Document model + API
+- [ ] Metin çıkarımı (pdfplumber / python-docx)
+- [ ] Indexleme Celery job
+- [ ] Doküman arama endpoint
+
+### Faz 3: RAG / Chat Modülü
+- [ ] LangChain retriever (Qdrant)
+- [ ] Chat endpoint (`POST /chat`)
+- [ ] Streaming response (SSE)
+- [ ] Kaynak gösterimi
+
+### Faz 4: Dava Dosyası & Masraf Modülü
+- [ ] CaseFile CRUD
+- [ ] Expense CRUD
+- [ ] Balance hesaplama
+- [ ] ExpenseCategory seed
+
+### Faz 5: UI / Frontend
+- (Ayrı plana bağlı)
+
+---
+
+## 12) Teknik Notlar / TODO
+
+- [x] Storage seçimi: **Cloudflare R2**
+- [x] Vector store seçimi: **Qdrant Cloud**
+- [x] Embedding model: **text-embedding-3-small (1536 dim)**
+- [x] Embedding yöntemi: **OpenAI Batch API**
+- [ ] Metin çıkarımı kütüphaneleri: pdfplumber, python-docx, unstructured
+- [ ] Takvim entegrasyonu (Google Calendar) auth akışı
+- [ ] UYAP/E-tebligat kapsamı (faz-2+)
+- [ ] Observability: Sentry + structured logs + celery monitoring
+- [ ] Hybrid search (BM25 + vector) değerlendirmesi
+- [ ] Reranking (cross-encoder) değerlendirmesi
+
+---
+
+## 13) Referans Dosyalar
+- Tasarım dokümanı: `lawApp_design.pages` (preview görseli üzerinden çıkarım)
+- Tablo örnekleri: `dava-masraf_tables.xlsx`

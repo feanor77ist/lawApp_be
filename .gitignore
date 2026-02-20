@@ -2,6 +2,9 @@
 *.env
 .env
 documents/
+/data
+data/
+static/
 
 # macOS
 .DS_Store

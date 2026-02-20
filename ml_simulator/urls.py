@@ -16,7 +16,6 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.shortcuts import redirect
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
@@ -24,14 +23,7 @@ from django.urls import re_path
 from django.contrib.auth import views as auth_views
 from django.views.decorators.cache import cache_control
 
-
-def redirect_to_frontend(request):
-    # Ortama göre frontend URL'si
-    frontend_url = "https://ml-simulator-fe.vercel.app" if not settings.DEBUG else "http://localhost:3000"
-    return redirect(frontend_url)
-
 urlpatterns = [
-    path('', redirect_to_frontend),
     path('admin/', admin.site.urls),
     path('api/', include('my_app.urls')),
 ]
@@ -41,8 +33,6 @@ urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 urlpatterns += [
     re_path(r'^media/(?P<path>.*)$', cache_control(max_age=31536000, public=True)(serve), {'document_root': settings.MEDIA_ROOT})]
-
-admin.site.site_header = "Eğitim Yönetim Portalı"
 
 urlpatterns += [
     path('auth/password-reset/', auth_views.PasswordResetView.as_view(), name='password_reset'),

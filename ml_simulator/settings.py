@@ -146,6 +146,9 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Custom User Model
+AUTH_USER_MODEL = 'my_app.User'
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'documents' if DEBUG else '/documents'
 
@@ -240,12 +243,12 @@ else:
         },
     }
 
-DEFAULT_FROM_EMAIL = 'simact@dalecarnegie.com.tr'
+DEFAULT_FROM_EMAIL = 'support@libreconsulting.org'
 # SERVER_EMAIL = 'simact@dalecarnegie.com.tr'
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'ms2.guzel.net.tr'
+EMAIL_HOST = 'box5372.bluehost.com'
 EMAIL_PORT = 465
 EMAIL_USE_SSL = True
-EMAIL_HOST_USER = 'simact@dalecarnegie.com.tr'
+EMAIL_HOST_USER = 'support@libreconsulting.org'
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
