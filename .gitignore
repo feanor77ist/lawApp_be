@@ -6,6 +6,10 @@ documents/
 data/
 static/
 
+# Embedding batch dosyaları
+batches/
+batch_files_pilot/
+
 # macOS
 .DS_Store
 .DS_Store?
