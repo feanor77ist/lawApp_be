@@ -48,9 +48,16 @@
     .btn-add:hover { border-color: var(--primary); color: var(--primary); }
     .btn-remove { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; font-size: 1.1rem; line-height: 1; }
     .btn-remove:hover { color: #d93025; }
-    .submit-wrap { margin-top: 32px; margin-bottom: 16px; }
+    .page-nav { margin-top: 28px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .page-nav button {
+      padding: 10px 20px; border-radius: 6px; font: inherit; font-size: 0.9375rem; font-weight: 500; cursor: pointer;
+    }
+    .btn-prev { background: #fff; border: 1px solid var(--border); color: var(--text); }
+    .btn-prev:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-next { background: var(--primary); border: none; color: #fff; }
+    .btn-next:hover { background: var(--primary-hover); }
     button[type="submit"] {
-      background: var(--primary); color: #fff; border: none; padding: 12px 24px; border-radius: 4px;
+      background: var(--primary); color: #fff; border: none; padding: 10px 20px; border-radius: 6px;
       font: inherit; font-size: 0.9375rem; font-weight: 500; cursor: pointer;
     }
     button[type="submit"]:hover { background: var(--primary-hover); }
@@ -61,7 +68,7 @@
   <div class="container">
     <div class="card">
       <h1>RAG Hukuki Asistan – Test Senaryosu</h1>
-      <p class="subtitle">Son kullanıcı işletim senaryoları için test senaryoları toplamak amacıyla hazırlanmıştır. Tüm sekmeleri doldurup en alttan tek seferde gönderin.</p>
+      <p class="subtitle">Son kullanıcı işletim senaryoları için test senaryoları toplamak amacıyla hazırlanmıştır. Her sayfayı doldurup "Sonraki" ile ilerleyin, son sayfada "Tümünü gönder" ile tek seferde gönderin.</p>
 
       <form id="mainForm" action="https://formspree.io/f/xnjgjwdj" method="POST">
         <input type="hidden" name="_subject" value="RAG Test Senaryosu - Toplu başvuru" />
@@ -93,18 +100,21 @@
           <button type="button" class="btn-add" id="add_karar">+ Satır ekle</button>
           <label>Ek notlar (Karar Arama)</label>
           <textarea name="ek_notlar_karar" rows="2"></textarea>
+          <div class="page-nav" data-page="karar_arama">
+            <button type="button" class="btn-next" data-goto="chat_asistan">Sonraki</button>
+          </div>
         </div>
 
         <!-- Sayfa 2: Chat Asistan -->
         <div id="page_chat_asistan" class="form-page">
-          <p class="section-desc">Çok turlu sohbet testleri için örnek diyaloglar.</p>
+          <p class="section-desc">Hukuki asistanla sohbet ederken ne gibi sorular sormak isteyebileceğinize dair örnekler vermenizi bekliyoruz. Çok turlu bir diyalog kurgulayabilirsiniz: örneğin ilk turda "İşe iade davası nedir, hangi koşullarda açılır?", sonraki turda "İşe iade davası kazanılırsa işveren ne yapmak zorunda?" gibi. Her satırda kullanıcı sorusu ve asistanın cevabında yer alması beklenen hukuki odakları (madde, kavram) yazın.</p>
           <table class="input-table">
             <thead><tr><th style="width:50px">Tur</th><th>Kullanıcı sorusu</th><th>Beklenen cevap odakları</th><th style="width:40px"></th></tr></thead>
             <tbody id="chat_rows">
               <tr>
                 <td>1</td>
-                <td><textarea class="textarea-sorgu" name="chat_soru_1" placeholder="Kullanıcının sorduğu soru (uzun metin girebilirsiniz)" rows="3"></textarea></td>
-                <td><input type="text" name="chat_beklenen_1" placeholder="Beklenen konu başlıkları" /></td>
+                <td><textarea class="textarea-sorgu" name="chat_soru_1" placeholder="Örn: İşe iade davası nedir, hangi koşullarda açılır?" rows="3"></textarea></td>
+                <td><input type="text" name="chat_beklenen_1" placeholder="Örn: İş K. 21, 20+ işçi, fesih bildirimi, 1 ay süre" /></td>
                 <td></td>
               </tr>
             </tbody>
@@ -112,6 +122,10 @@
           <button type="button" class="btn-add" id="add_chat">+ Tur ekle</button>
           <label>Ek notlar (Chat Asistan)</label>
           <textarea name="ek_notlar_chat" rows="2"></textarea>
+          <div class="page-nav" data-page="chat_asistan">
+            <button type="button" class="btn-prev" data-goto="karar_arama">Önceki</button>
+            <button type="button" class="btn-next" data-goto="sozlesme_inceleme">Sonraki</button>
+          </div>
         </div>
 
         <!-- Sayfa 3: Sözleşme İnceleme -->
@@ -133,6 +147,10 @@
           <button type="button" class="btn-add" id="add_sozlesme">+ Sorgu ekle</button>
           <label>Ek notlar (Sözleşme İnceleme)</label>
           <textarea name="ek_notlar_sozlesme" rows="2"></textarea>
+          <div class="page-nav" data-page="sozlesme_inceleme">
+            <button type="button" class="btn-prev" data-goto="chat_asistan">Önceki</button>
+            <button type="button" class="btn-next" data-goto="dilekce_uretimi">Sonraki</button>
+          </div>
         </div>
 
         <!-- Sayfa 4: Dilekçe Üretimi -->
@@ -154,9 +172,11 @@
           <textarea name="dilekce_test_sorgusu" rows="3" placeholder="Bu dava için dilekçe taslağı oluştur. Davacı ..., davalı ..., fesih tarihi ..."></textarea>
           <label>Ek notlar (Dilekçe Üretimi)</label>
           <textarea name="ek_notlar_dilekce" rows="2"></textarea>
+          <div class="page-nav" data-page="dilekce_uretimi">
+            <button type="button" class="btn-prev" data-goto="sozlesme_inceleme">Önceki</button>
+            <button type="submit">Tümünü gönder</button>
+          </div>
         </div>
-
-        <div class="submit-wrap"><button type="submit">Tümünü gönder</button></div>
       </form>
     </div>
     <p class="note">Formu paylaşmak için (projeyi GitHub’a push ettikten sonra): <a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/feanor77ist/lawApp_be/main/rag-test-senaryosu-formu.html" target="_blank" rel="noopener">bu linki kullanın</a></p>
@@ -176,6 +196,10 @@
       }
       navBtns.forEach(function(btn) {
         btn.addEventListener('click', function() { showPage(this.getAttribute('data-page')); });
+      });
+      document.querySelectorAll('.page-nav .btn-prev, .page-nav .btn-next').forEach(function(btn) {
+        var goto = btn.getAttribute('data-goto');
+        if (goto) btn.addEventListener('click', function() { showPage(goto); });
       });
       showPage('karar_arama');
 
