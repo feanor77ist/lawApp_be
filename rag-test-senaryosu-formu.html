@@ -8,88 +8,31 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet" />
   <style>
-    :root {
-      --bg: #f0f2f5;
-      --card: #fff;
-      --border: #dadce0;
-      --primary: #1a73e8;
-      --primary-hover: #1557b0;
-      --text: #202124;
-      --text-secondary: #5f6368;
-      --required: #d93025;
-    }
+    :root { --bg: #f0f2f5; --card: #fff; --border: #dadce0; --primary: #1a73e8; --primary-hover: #1557b0; --text: #202124; --text-secondary: #5f6368; }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: 'DM Sans', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      padding: 24px 16px 48px;
+    body { margin: 0; font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: 24px 16px 48px; }
+    .container { max-width: 640px; margin: 0 auto; }
+    .card { background: var(--card); border-radius: 8px; padding: 24px 24px 32px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+    h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 8px; color: var(--text); }
+    .subtitle { color: var(--text-secondary); font-size: 0.875rem; margin: 0 0 20px; }
+    .nav-pages { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .nav-pages button {
+      padding: 10px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--card);
+      font: inherit; font-size: 0.875rem; color: var(--text); cursor: pointer;
     }
-    .container {
-      max-width: 640px;
-      margin: 0 auto;
-    }
-    .card {
-      background: var(--card);
-      border-radius: 8px;
-      padding: 24px 24px 32px;
-      margin-bottom: 12px;
-      box-shadow: 0 1px 2px rgba(0,0,0,.08);
-    }
-    h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      margin: 0 0 8px;
-      color: var(--text);
-    }
-    .subtitle {
-      color: var(--text-secondary);
-      font-size: 0.875rem;
-      margin: 0 0 24px;
-    }
-    .section-title {
-      font-size: 1rem;
-      font-weight: 600;
-      margin: 24px 0 8px;
-      color: var(--text);
-    }
-    .section-desc {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      margin: 0 0 16px;
-    }
-    label {
-      display: block;
-      font-size: 0.875rem;
-      font-weight: 500;
-      margin-bottom: 6px;
-      color: var(--text);
-    }
-    label .required { color: var(--required); }
-    input[type="text"],
-    input[type="email"],
-    textarea {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font: inherit;
-      font-size: 0.875rem;
-      margin-bottom: 16px;
+    .nav-pages button:hover { border-color: var(--primary); color: var(--primary); }
+    .nav-pages button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .form-page { display: none; }
+    .form-page.active { display: block; }
+    .section-desc { font-size: 0.875rem; color: var(--text-secondary); margin: 0 0 16px; }
+    label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+    input[type="text"], textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 4px;
+      font: inherit; font-size: 0.875rem; margin-bottom: 16px;
     }
     textarea { min-height: 80px; resize: vertical; }
-    input:focus, textarea:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 2px rgba(26,115,232,.2);
-    }
-    .row-fields {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
+    input:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,115,232,.2); }
+    .row-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 520px) { .row-fields { grid-template-columns: 1fr; } }
     table.input-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
     table.input-table th, table.input-table td { padding: 8px 6px; text-align: left; vertical-align: top; }
@@ -97,102 +40,41 @@
     table.input-table input, table.input-table textarea { margin: 0; min-width: 0; }
     table.input-table textarea { min-height: 48px; }
     .btn-add {
-      background: none;
-      border: 1px dashed var(--border);
-      color: var(--text-secondary);
-      padding: 8px 12px;
-      border-radius: 4px;
-      font: inherit;
-      font-size: 0.875rem;
-      cursor: pointer;
-      margin-bottom: 16px;
+      background: none; border: 1px dashed var(--border); color: var(--text-secondary);
+      padding: 8px 12px; border-radius: 4px; font: inherit; font-size: 0.875rem; cursor: pointer; margin-bottom: 16px;
     }
     .btn-add:hover { border-color: var(--primary); color: var(--primary); }
-    .btn-remove {
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      cursor: pointer;
-      padding: 4px;
-      font-size: 1.1rem;
-      line-height: 1;
-    }
-    .btn-remove:hover { color: var(--required); }
+    .btn-remove { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; font-size: 1.1rem; line-height: 1; }
+    .btn-remove:hover { color: #d93025; }
     .submit-wrap { margin-top: 32px; }
     button[type="submit"] {
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 4px;
-      font: inherit;
-      font-size: 0.9375rem;
-      font-weight: 500;
-      cursor: pointer;
+      background: var(--primary); color: #fff; border: none; padding: 12px 24px; border-radius: 4px;
+      font: inherit; font-size: 0.9375rem; font-weight: 500; cursor: pointer;
     }
     button[type="submit"]:hover { background: var(--primary-hover); }
-    .scenario-block { display: none; }
-    .scenario-block.active { display: block; }
-    .tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 20px;
-    }
-    .tabs label {
-      display: inline-flex;
-      align-items: center;
-      margin: 0;
-      cursor: pointer;
-    }
-    .tabs input { width: auto; margin: 0 6px 0 0; }
-    .note {
-      font-size: 0.8125rem;
-      color: var(--text-secondary);
-      margin-top: 8px;
-    }
+    .note { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 16px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card">
       <h1>RAG Hukuki Asistan – Test Senaryosu</h1>
-      <p class="subtitle">
-        Bu form, son kullanıcı işletim senaryoları için test senaryoları toplamak amacıyla hazırlanmıştır.
-        Kendi alanınız doğrultusunda ilgili örnekleri doldurunuz.
-      </p>
+      <p class="subtitle">Son kullanıcı işletim senaryoları için test senaryoları toplamak amacıyla hazırlanmıştır. Aşağıdan sayfa seçin ve formu doldurun.</p>
+      <div class="nav-pages">
+        <button type="button" data-page="karar_arama">1) Karar Arama</button>
+        <button type="button" data-page="chat_asistan">2) Chat Asistan</button>
+        <button type="button" data-page="sozlesme_inceleme">3) Sözleşme İnceleme</button>
+        <button type="button" data-page="dilekce_uretimi">4) Dilekçe Üretimi</button>
+      </div>
 
-      <form id="form" action="https://formspree.io/f/xnjgjwdj" method="POST">
-        <input type="hidden" name="_subject" value="RAG Test Senaryosu - Yeni başvuru" />
-        <input type="hidden" name="senaryo_turu" id="hidden_scenario_type" value="" />
-
-        <label>Adınız / Unvan (isteğe bağlı)</label>
-        <input type="text" name="gonderen_adi" placeholder="Örn: Av. …" />
-
-        <label>E-posta <span class="required">*</span></label>
-        <input type="email" name="email" required placeholder="cevapların size iletilebilmesi için" />
-
-        <div class="section-title">Hangi tür test senaryosu göndermek istiyorsunuz?</div>
-        <div class="tabs">
-          <label><input type="radio" name="scenario_type" value="karar_arama" /> 1) Karar Arama (İçtihat / Yargıtay)</label>
-          <label><input type="radio" name="scenario_type" value="chat_asistan" /> 2) Chat Asistan (RAG Sohbet)</label>
-          <label><input type="radio" name="scenario_type" value="sozlesme_inceleme" /> 3) Sözleşme İnceleme</label>
-          <label><input type="radio" name="scenario_type" value="dilekce_uretimi" /> 4) Dilekçe Üretimi</label>
-        </div>
-
-        <!-- 1) Karar Arama -->
-        <div id="block_karar_arama" class="scenario-block card">
-          <div class="section-title">1) Karar Arama (İçtihat / Yargıtay)</div>
-          <p class="section-desc">Karar veritabanı üzerinde arama ve filtreleme testleri için örnek sorgular. Her satır için sorgu metni ve beklenen kavram/sonuç notunu girin.</p>
+      <!-- Sayfa 1: Karar Arama -->
+      <div id="page_karar_arama" class="form-page active">
+        <form action="https://formspree.io/f/xnjgjwdj" method="POST">
+          <input type="hidden" name="_subject" value="RAG Test Senaryosu - Karar Arama" />
+          <input type="hidden" name="senaryo_turu" value="karar_arama" />
+          <p class="section-desc">Karar veritabanı üzerinde arama ve filtreleme testleri için örnek sorgular.</p>
           <table class="input-table">
-            <thead>
-              <tr>
-                <th style="width:50px">#</th>
-                <th>Sorgu metni</th>
-                <th>Beklenen kavram / sonuç notu</th>
-                <th style="width:40px"></th>
-              </tr>
-            </thead>
+            <thead><tr><th style="width:50px">#</th><th>Sorgu metni</th><th>Beklenen kavram / sonuç notu</th><th style="width:40px"></th></tr></thead>
             <tbody id="karar_rows">
               <tr>
                 <td>1</td>
@@ -203,180 +85,135 @@
             </tbody>
           </table>
           <button type="button" class="btn-add" id="add_karar">+ Satır ekle</button>
-        </div>
+          <label>Ek notlar</label>
+          <textarea name="ek_notlar" rows="2"></textarea>
+          <div class="submit-wrap"><button type="submit">Gönder</button></div>
+        </form>
+      </div>
 
-        <!-- 2) Chat Asistan -->
-        <div id="block_chat_asistan" class="scenario-block card">
-          <div class="section-title">2) Chat Asistan (RAG Sohbet)</div>
-          <p class="section-desc">Çok turlu sohbet testleri için örnek diyaloglar. Her turda kullanıcı sorusu ve beklenen cevap odakları.</p>
+      <!-- Sayfa 2: Chat Asistan -->
+      <div id="page_chat_asistan" class="form-page">
+        <form action="https://formspree.io/f/xnjgjwdj" method="POST">
+          <input type="hidden" name="_subject" value="RAG Test Senaryosu - Chat Asistan" />
+          <input type="hidden" name="senaryo_turu" value="chat_asistan" />
+          <p class="section-desc">Çok turlu sohbet testleri için örnek diyaloglar.</p>
           <table class="input-table">
-            <thead>
-              <tr>
-                <th style="width:50px">Tur</th>
-                <th>Kullanıcı sorusu</th>
-                <th>Beklenen cevap odakları</th>
-                <th style="width:40px"></th>
-              </tr>
-            </thead>
+            <thead><tr><th style="width:50px">Tur</th><th>Kullanıcı sorusu</th><th>Beklenen cevap odakları</th><th style="width:40px"></th></tr></thead>
             <tbody id="chat_rows">
               <tr>
                 <td>1</td>
                 <td><input type="text" name="chat_soru_1" placeholder="Kullanıcının sorduğu soru" /></td>
-                <td><input type="text" name="chat_beklenen_1" placeholder="Sistemin cevaplaması beklenen konu başlıkları" /></td>
+                <td><input type="text" name="chat_beklenen_1" placeholder="Beklenen konu başlıkları" /></td>
                 <td></td>
               </tr>
             </tbody>
           </table>
           <button type="button" class="btn-add" id="add_chat">+ Tur ekle</button>
-        </div>
+          <label>Ek notlar</label>
+          <textarea name="ek_notlar" rows="2"></textarea>
+          <div class="submit-wrap"><button type="submit">Gönder</button></div>
+        </form>
+      </div>
 
-        <!-- 3) Sözleşme İnceleme -->
-        <div id="block_sozlesme_inceleme" class="scenario-block card">
-          <div class="section-title">3) Sözleşme İnceleme</div>
+      <!-- Sayfa 3: Sözleşme İnceleme -->
+      <div id="page_sozlesme_inceleme" class="form-page">
+        <form action="https://formspree.io/f/xnjgjwdj" method="POST">
+          <input type="hidden" name="_subject" value="RAG Test Senaryosu - Sözleşme İnceleme" />
+          <input type="hidden" name="senaryo_turu" value="sozlesme_inceleme" />
           <p class="section-desc">Yüklenecek örnek sözleşme metnini ve test sorgularını girin.</p>
           <label>Yüklenecek metin (örnek sözleşme parçası)</label>
-          <textarea name="sozlesme_metin" rows="6" placeholder="KİRA SÖZLEŞMESİ&#10;Taraflar: ...&#10;Konu: ...&#10;..."></textarea>
+          <textarea name="sozlesme_metin" rows="6" placeholder="KİRA SÖZLEŞMESİ&#10;Taraflar: ...&#10;Konu: ..."></textarea>
           <table class="input-table">
-            <thead>
-              <tr>
-                <th style="width:50px">#</th>
-                <th>Sorgu</th>
-                <th>Beklenen çıktı odakları</th>
-                <th style="width:40px"></th>
-              </tr>
-            </thead>
+            <thead><tr><th style="width:50px">#</th><th>Sorgu</th><th>Beklenen çıktı odakları</th><th style="width:40px"></th></tr></thead>
             <tbody id="sozlesme_rows">
               <tr>
                 <td>1</td>
                 <td><input type="text" name="sozlesme_sorgu_1" placeholder="Örn: Bu sözleşmedeki riskli maddeleri listele" /></td>
-                <td><input type="text" name="sozlesme_beklenen_1" placeholder="Beklenen çıktı odakları" /></td>
+                <td><input type="text" name="sozlesme_beklenen_1" /></td>
                 <td></td>
               </tr>
             </tbody>
           </table>
           <button type="button" class="btn-add" id="add_sozlesme">+ Sorgu ekle</button>
-        </div>
+          <label>Ek notlar</label>
+          <textarea name="ek_notlar" rows="2"></textarea>
+          <div class="submit-wrap"><button type="submit">Gönder</button></div>
+        </form>
+      </div>
 
-        <!-- 4) Dilekçe Üretimi -->
-        <div id="block_dilekce_uretimi" class="scenario-block card">
-          <div class="section-title">4) Dilekçe Üretimi</div>
+      <!-- Sayfa 4: Dilekçe Üretimi -->
+      <div id="page_dilekce_uretimi" class="form-page">
+        <form action="https://formspree.io/f/xnjgjwdj" method="POST">
+          <input type="hidden" name="_subject" value="RAG Test Senaryosu - Dilekçe Üretimi" />
+          <input type="hidden" name="senaryo_turu" value="dilekce_uretimi" />
           <p class="section-desc">Bağlam (dava türü, taraflar, talep) ve beklenen dilekçe bölümleri.</p>
           <div class="row-fields">
-            <div>
-              <label>Dava türü</label>
-              <input type="text" name="dilekce_dava_turu" placeholder="Örn: İşe iade (İş K. 21)" />
-            </div>
-            <div>
-              <label>Davacı</label>
-              <input type="text" name="dilekce_davaci" placeholder="Örn: Ad Soyad, eski işçi" />
-            </div>
+            <div><label>Dava türü</label><input type="text" name="dilekce_dava_turu" placeholder="Örn: İşe iade (İş K. 21)" /></div>
+            <div><label>Davacı</label><input type="text" name="dilekce_davaci" placeholder="Örn: Ad Soyad, eski işçi" /></div>
           </div>
           <div class="row-fields">
-            <div>
-              <label>Davalı</label>
-              <input type="text" name="dilekce_davali" placeholder="Örn: … Ltd. Şti. (işveren)" />
-            </div>
-            <div>
-              <label>Talep</label>
-              <input type="text" name="dilekce_talep" placeholder="Örn: İşe iade; işe alınmazsa 4–8 aylık tazminat" />
-            </div>
+            <div><label>Davalı</label><input type="text" name="dilekce_davali" placeholder="Örn: … Ltd. Şti." /></div>
+            <div><label>Talep</label><input type="text" name="dilekce_talep" placeholder="Örn: İşe iade; 4–8 aylık tazminat" /></div>
           </div>
           <label>Kısa olay özeti</label>
-          <textarea name="dilekce_olay" rows="3" placeholder="20’den fazla işçi çalışan işyerinde belirsiz süreli iş sözleşmesi; geçerli sebep göstermeden fesih; fesih bildirimi yazılı yapılmamış vb."></textarea>
-          <label>Beklenen dilekçe bölümleri / anahtar ifadeler (her satır: Bölüm – İçerik)</label>
-          <textarea name="dilekce_bolumler" rows="5" placeholder="Mahkeme: … İş Mahkemesi&#10;Konu: İşe iade talebi&#10;Taraflar: Taraflar, vekiller&#10;Olay özeti: İş ilişkisi, fesih, işçi sayısı (20+)&#10;Hukuki sebepler: İş K. 18, 20, 21&#10;Sonuç ve talep: İşe iade; aksi halde 4–8 aylık tazminat"></textarea>
+          <textarea name="dilekce_olay" rows="3" placeholder="İş ilişkisi, fesih, işçi sayısı vb."></textarea>
+          <label>Beklenen dilekçe bölümleri / anahtar ifadeler</label>
+          <textarea name="dilekce_bolumler" rows="5" placeholder="Mahkeme, Konu, Taraflar, Olay özeti, Hukuki sebepler, Sonuç ve talep..."></textarea>
           <label>Test sorgusu örneği</label>
-          <input type="text" name="dilekce_test_sorgusu" placeholder="Örn: Bu dava dosyası için işe iade talepli dilekçe taslağı oluştur. Davacı [Ad Soyad], davalı [Şirket]..." />
-        </div>
-
-        <label>Ek notlar (isteğe bağlı)</label>
-        <textarea name="ek_notlar" rows="2" placeholder="Varsa eklemek istedikleriniz"></textarea>
-
-        <div class="submit-wrap">
-          <button type="submit">Gönder</button>
-        </div>
-      </form>
+          <input type="text" name="dilekce_test_sorgusu" placeholder="Bu dava için dilekçe taslağı oluştur..." />
+          <label>Ek notlar</label>
+          <textarea name="ek_notlar" rows="2"></textarea>
+          <div class="submit-wrap"><button type="submit">Gönder</button></div>
+        </form>
+      </div>
     </div>
-    <p class="note" style="padding: 0 4px;">
-      Formu paylaşmak için (projeyi GitHub’a push ettikten sonra): <a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/feanor77ist/lawApp_be/main/rag-test-senaryosu-formu.html" target="_blank" rel="noopener">bu linki kullanın</a>
-    </p>
+    <p class="note">Formu paylaşmak için (projeyi GitHub’a push ettikten sonra): <a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/feanor77ist/lawApp_be/main/rag-test-senaryosu-formu.html" target="_blank" rel="noopener">bu linki kullanın</a></p>
   </div>
 
   <script>
     (function() {
-      var form = document.getElementById('form');
-      var blocks = {
-        karar_arama: document.getElementById('block_karar_arama'),
-        chat_asistan: document.getElementById('block_chat_asistan'),
-        sozlesme_inceleme: document.getElementById('block_sozlesme_inceleme'),
-        dilekce_uretimi: document.getElementById('block_dilekce_uretimi')
-      };
-      var hiddenType = document.getElementById('hidden_scenario_type');
-      var radios = form.querySelectorAll('input[name="scenario_type"]');
-
-      function showBlock(value) {
-        Object.keys(blocks).forEach(function(k) {
-          blocks[k].classList.toggle('active', k === value);
+      var pages = ['karar_arama', 'chat_asistan', 'sozlesme_inceleme', 'dilekce_uretimi'];
+      var navBtns = document.querySelectorAll('.nav-pages button');
+      function showPage(id) {
+        pages.forEach(function(p) {
+          var el = document.getElementById('page_' + p);
+          el.classList.toggle('active', p === id);
         });
-        hiddenType.value = value || '';
+        navBtns.forEach(function(btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-page') === id);
+        });
       }
-
-      radios.forEach(function(r) {
-        r.addEventListener('change', function() { showBlock(this.value); });
+      navBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() { showPage(this.getAttribute('data-page')); });
       });
-      showBlock('');
+      showPage('karar_arama');
 
-      // Karar Arama: satır ekle
       var kararIndex = 2;
       document.getElementById('add_karar').addEventListener('click', function() {
         var tbody = document.getElementById('karar_rows');
         var tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + kararIndex + '</td>' +
-          '<td><input type="text" name="karar_sorgu_' + kararIndex + '" /></td>' +
-          '<td><input type="text" name="karar_beklenen_' + kararIndex + '" /></td>' +
-          '<td><button type="button" class="btn-remove" aria-label="Kaldır">×</button></td>';
+        tr.innerHTML = '<td>' + kararIndex + '</td><td><input type="text" name="karar_sorgu_' + kararIndex + '" /></td><td><input type="text" name="karar_beklenen_' + kararIndex + '" /></td><td><button type="button" class="btn-remove">×</button></td>';
         kararIndex++;
         tr.querySelector('.btn-remove').onclick = function() { tr.remove(); };
         tbody.appendChild(tr);
       });
-
-      // Chat: tur ekle
       var chatIndex = 2;
       document.getElementById('add_chat').addEventListener('click', function() {
         var tbody = document.getElementById('chat_rows');
         var tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + chatIndex + '</td>' +
-          '<td><input type="text" name="chat_soru_' + chatIndex + '" /></td>' +
-          '<td><input type="text" name="chat_beklenen_' + chatIndex + '" /></td>' +
-          '<td><button type="button" class="btn-remove" aria-label="Kaldır">×</button></td>';
+        tr.innerHTML = '<td>' + chatIndex + '</td><td><input type="text" name="chat_soru_' + chatIndex + '" /></td><td><input type="text" name="chat_beklenen_' + chatIndex + '" /></td><td><button type="button" class="btn-remove">×</button></td>';
         chatIndex++;
         tr.querySelector('.btn-remove').onclick = function() { tr.remove(); };
         tbody.appendChild(tr);
       });
-
-      // Sözleşme: sorgu ekle
       var sozlesmeIndex = 2;
       document.getElementById('add_sozlesme').addEventListener('click', function() {
         var tbody = document.getElementById('sozlesme_rows');
         var tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + sozlesmeIndex + '</td>' +
-          '<td><input type="text" name="sozlesme_sorgu_' + sozlesmeIndex + '" /></td>' +
-          '<td><input type="text" name="sozlesme_beklenen_' + sozlesmeIndex + '" /></td>' +
-          '<td><button type="button" class="btn-remove" aria-label="Kaldır">×</button></td>';
+        tr.innerHTML = '<td>' + sozlesmeIndex + '</td><td><input type="text" name="sozlesme_sorgu_' + sozlesmeIndex + '" /></td><td><input type="text" name="sozlesme_beklenen_' + sozlesmeIndex + '" /></td><td><button type="button" class="btn-remove">×</button></td>';
         sozlesmeIndex++;
         tr.querySelector('.btn-remove').onclick = function() { tr.remove(); };
         tbody.appendChild(tr);
-      });
-
-      // Gönderirken sadece seçili türün alanları anlamlı; hepsi POST edilir, Formspree hepsini toplar
-      form.addEventListener('submit', function(e) {
-        var selected = form.scenario_type.value;
-        if (!selected) {
-          e.preventDefault();
-          alert('Lütfen bir senaryo türü seçin.');
-          return;
-        }
-        hiddenType.value = selected;
       });
     })();
   </script>
