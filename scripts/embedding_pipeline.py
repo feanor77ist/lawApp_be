@@ -16,23 +16,26 @@ Batch Boyutu Stratejisi (Tier 3 - 100M enqueued token limiti):
   │ 2.8M tok (~3K)  │ 35           │ ~5.000      │ Tier 1 için uygun              │
   └─────────────────┴──────────────┴─────────────┴────────────────────────────────┘
 
-  Yargıtay kararları (decision_contents): 9.8M karar → ~13.9M chunk → ~13.9B token
-    - MAX_TOKENS_PER_BATCH = 10_000_000 (10M)
-    - ~1.400 batch dosyası, 10 tanesi paralel işlenir
-    - Tahmini maliyet: ~$140 (batch %50 indirimli, $0.01/1M token)
+  Yargıtay kararları (decision_contents): 9.8M karar → ~14.2M chunk
+    - RecursiveCharacterTextSplitter ile ortalama ~580 token/chunk → ~8.3B token (tahmin: ~13.9B)
+    - MAX_TOKENS_PER_BATCH = 10_000_000 (10M) → ~826 batch (tahmin ~1.400 idi; küçük chunk'lar sayesinde daha az)
+    - Tahmini maliyet: ~$83 (batch %50 indirimli, $0.01/1M token)
     - Tahmini süre: 2-3 gün (OpenAI işleme + indirme + upsert)
 
 Kullanım:
   # 1) PostgreSQL'den oku, chunk'la ve JSONL batch dosyaları üret
   python scripts/embedding_pipeline.py prepare --table decision_contents --out-dir batches/yargitay
 
-  # 2) Batch dosyalarını OpenAI'a gönder
+  # 2) Batch dosyalarını OpenAI'a gönder (bitince otomatik verify + retry yapar)
   python scripts/embedding_pipeline.py submit --batch-dir batches/yargitay
 
   # 3) Batch durumlarını izle ve sonuçları indir
   python scripts/embedding_pipeline.py poll --batch-dir batches/yargitay
 
-  # 4) Embedding sonuçlarını Qdrant'a yaz (sunucuda çalıştır - hızlı)
+  # 4) Completed batch'leri doğrula, partial failure varsa retry gönder (bağımsız)
+  python scripts/embedding_pipeline.py verify --batch-dir batches/yargitay
+
+  # 5) Embedding sonuçlarını Qdrant'a yaz (sunucuda çalıştır - hızlı)
   python scripts/embedding_pipeline.py upsert --batch-dir batches/yargitay --remote --cleanup
 """
 
@@ -44,6 +47,7 @@ import time
 from pathlib import Path
 
 import tiktoken
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIM = 1536
@@ -55,6 +59,8 @@ MAX_ENQUEUED_TOKENS = 100_000_000  # Tier 3: aynı anda kuyrukta max 100M token
 MAX_TOKENS_PER_BATCH = 10_000_000  # Tier 3: tek batch dosyasının token üst sınırı
 CHECKPOINT_FILE = "checkpoint.json"
 BATCH_REGISTRY = "batch_registry.json"
+API_MAX_RETRIES = 5
+API_BASE_DELAY = 5  # saniye, exponential backoff için
 
 # PostgreSQL bağlantı bilgileri (.env'den yüklenir)
 DB_TABLES = {
@@ -86,33 +92,27 @@ DB_TABLES = {
 
 
 # ---------------------------------------------------------------------------
-# Tokenizer
+# Chunking (RecursiveCharacterTextSplitter + tiktoken)
 # ---------------------------------------------------------------------------
 
 _enc = tiktoken.encoding_for_model(EMBEDDING_MODEL)
+
+# Paragraf/satır/kelime sınırlarını koruyarak token bazlı bölme (embedding modeli ile uyumlu)
+_text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+    model_name=EMBEDDING_MODEL,
+    chunk_size=CHUNK_TARGET_TOKENS,
+    chunk_overlap=CHUNK_OVERLAP_TOKENS,
+    separators=["\n\n", "\n", ". ", " ", ""],
+)
 
 
 def count_tokens(text: str) -> int:
     return len(_enc.encode(text))
 
 
-def chunk_text(text: str, target: int = CHUNK_TARGET_TOKENS, overlap: int = CHUNK_OVERLAP_TOKENS) -> list[str]:
-    """Token-bazlı chunking. Her chunk ≤ target token, komşu chunk'lar overlap kadar örtüşür."""
-    tokens = _enc.encode(text)
-    if len(tokens) <= target:
-        return [text]
-
-    chunks = []
-    start = 0
-    step = target - overlap
-    while start < len(tokens):
-        end = min(start + target, len(tokens))
-        chunk_tokens = tokens[start:end]
-        chunks.append(_enc.decode(chunk_tokens))
-        if end >= len(tokens):
-            break
-        start += step
-    return chunks
+def chunk_text(text: str) -> list[str]:
+    """RecursiveCharacterTextSplitter ile bölme (semantik bütünlük korunur)."""
+    return _text_splitter.split_text(text)
 
 
 # ---------------------------------------------------------------------------
@@ -251,7 +251,7 @@ def cmd_prepare(args):
         chunks = chunk_text(text)
 
         for chunk_i, chunk in enumerate(chunks):
-            chunk_tokens = count_tokens(chunk)
+            chunk_tokens = count_tokens(chunk)  # batch token limiti için
             record = {
                 "custom_id": f"{file_id}-chunk-{chunk_i}",
                 "method": "POST",
@@ -314,11 +314,71 @@ def cmd_prepare(args):
 # SUBMIT — JSONL dosyalarını OpenAI'a yükle ve batch oluştur
 # ---------------------------------------------------------------------------
 
+# Tier 3: 100M enqueued token, her batch ~10M token → max 10 paralel batch
+MAX_PARALLEL_BATCHES = MAX_ENQUEUED_TOKENS // MAX_TOKENS_PER_BATCH  # 100M / 10M = 10
+
+
+def _api_call(fn, description="API çağrısı", max_retries=API_MAX_RETRIES, base_delay=API_BASE_DELAY):
+    """API çağrılarını exponential backoff ile yeniden dener. Network/rate-limit hatalarına karşı dayanıklı."""
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise
+            delay = base_delay * (2 ** attempt)
+            print(f"    ⚠ {description} hatası ({attempt+1}/{max_retries}): {e}")
+            print(f"    {delay}s sonra tekrar denenecek...")
+            time.sleep(delay)
+
+
+def _count_in_progress(registry: dict) -> int:
+    """Registry'deki aktif (kuyrukta token tutan) batch sayısını döndürür.
+    validating + in_progress + finalizing: hepsi OpenAI kuyruğunda yer kaplar."""
+    return sum(1 for info in registry.values()
+               if info.get("status") in ("validating", "in_progress", "finalizing"))
+
+
+def _update_registry_statuses(client, registry: dict, registry_path: Path) -> int:
+    """Tüm aktif batch'lerin durumunu OpenAI'dan çeker ve günceller."""
+    completed_count = 0
+    for fname, info in registry.items():
+        if info.get("status") not in ("validating", "in_progress", "finalizing"):
+            continue
+        batch = _api_call(
+            lambda bid=info["batch_id"]: client.batches.retrieve(bid),
+            description=f"Durum sorgulama ({fname})"
+        )
+        old_status = info["status"]
+        info["status"] = batch.status
+        if batch.output_file_id:
+            info["output_file_id"] = batch.output_file_id
+        if batch.error_file_id:
+            info["error_file_id"] = batch.error_file_id
+        if old_status != batch.status:
+            counts = batch.request_counts
+            print(f"    [{fname}] {old_status} → {batch.status} "
+                  f"({counts.completed}/{counts.total} completed)")
+        if batch.status == "completed":
+            completed_count += 1
+    registry_path.write_text(json.dumps(registry, indent=2))
+    return completed_count
+
+
+def _wait_for_slot(client, registry: dict, registry_path: Path, interval: int = 60):
+    """Kuyrukta yer açılana kadar bekler (in-progress < MAX_PARALLEL_BATCHES)."""
+    while _count_in_progress(registry) >= MAX_PARALLEL_BATCHES:
+        active = _count_in_progress(registry)
+        print(f"  ⏳ Kuyruk dolu ({active}/{MAX_PARALLEL_BATCHES}), {interval}s bekleniyor...")
+        time.sleep(interval)
+        _update_registry_statuses(client, registry, registry_path)
+
+
 def cmd_submit(args):
     """
-    Batch dosyalarını toplu gönderir; enqueued token limiti dolunca otomatik bekler.
-    Kuyrukta yer açıldığında gönderime devam eder. PC açık olmalı ama
-    hepsi gönderilince (tüm batch'ler kuyruğa girince) kapatılabilir.
+    Batch dosyalarını toplu gönderir; max 10 paralel batch ile kuyruk yönetimi yapar.
+    Kuyruk dolunca otomatik bekler, yer açılınca devam eder.
+    Tüm batch'ler gönderildikten sonra otomatik verify + retry yapar.
     """
     from openai import OpenAI
     client = OpenAI(api_key=_get_api_key())
@@ -330,87 +390,283 @@ def cmd_submit(args):
     if registry_path.exists():
         registry = json.loads(registry_path.read_text())
 
-    jsonl_files = sorted(batch_dir.glob("batch_*.jsonl"))
+    if registry:
+        print("[submit] Mevcut batch durumları güncelleniyor...")
+        _update_registry_statuses(client, registry, registry_path)
+
+    jsonl_files = sorted(batch_dir.glob("batch_[0-9]*.jsonl"))
     pending = []
     for jf in jsonl_files:
         if jf.name in registry and registry[jf.name].get("status") not in ("failed", "expired", "cancelled"):
-            print(f"  [{jf.name}] zaten gönderilmiş (batch_id: {registry[jf.name]['batch_id']}), atlanıyor.")
             continue
         pending.append(jf)
 
-    print(f"[submit] {len(pending)} batch gönderilecek (toplam {len(jsonl_files)} dosya).")
+    total_files = len(jsonl_files)
+    already_sent = total_files - len(pending)
+    in_progress = _count_in_progress(registry)
+    print(f"[submit] {len(pending)} batch gönderilecek, {already_sent} zaten gönderilmiş, {in_progress} in-progress")
+
     if not pending:
         print("[submit] Gönderilecek batch yok.")
+        if args.verify:
+            _verify_and_retry(client, batch_dir, registry, registry_path, poll_interval)
         return
 
+    start_time = time.time()
     idx = 0
-    while idx < len(pending):
-        jf = pending[idx]
-        print(f"\n--- [{idx+1}/{len(pending)}] {jf.name} ---")
-        print(f"  Yükleniyor...")
-        with open(jf, "rb") as f:
-            file_obj = client.files.create(file=f, purpose="batch")
 
-        print(f"  Batch oluşturuluyor (file_id: {file_obj.id})...")
-        try:
-            batch = client.batches.create(
-                input_file_id=file_obj.id,
+    while idx < len(pending):
+        _wait_for_slot(client, registry, registry_path, poll_interval)
+
+        jf = pending[idx]
+        global_idx = already_sent + idx + 1
+        pct = global_idx / total_files * 100
+
+        elapsed = time.time() - start_time
+        if idx > 0 and elapsed > 0:
+            rate = idx / elapsed * 3600
+            eta_h = (len(pending) - idx) / rate if rate > 0 else 0
+            print(f"\n--- [{idx+1}/{len(pending)}] {jf.name}  |  genel: {global_idx}/{total_files} (%{pct:.1f})  |  {rate:.0f} batch/saat  |  kalan: ~{eta_h:.1f}s ---")
+        else:
+            print(f"\n--- [{idx+1}/{len(pending)}] {jf.name}  |  genel: {global_idx}/{total_files} (%{pct:.1f}) ---")
+
+        # Dosya yükleme (retry ile)
+        print(f"  Yükleniyor...")
+        file_obj = _api_call(
+            lambda path=jf: client.files.create(file=open(path, "rb"), purpose="batch"),
+            description=f"Dosya yükleme ({jf.name})"
+        )
+        uploaded_file_id = file_obj.id
+
+        # Batch oluşturma (retry ile, aynı file_id'yi kullanır)
+        print(f"  Batch oluşturuluyor (file_id: {uploaded_file_id})...")
+        batch = _api_call(
+            lambda fid=uploaded_file_id: client.batches.create(
+                input_file_id=fid,
                 endpoint="/v1/embeddings",
                 completion_window="24h",
-            )
-        except Exception as e:
-            err_msg = str(e)
-            if "token_limit_exceeded" in err_msg or "enqueued" in err_msg.lower():
-                print(f"  ⏳ Kuyruk dolu, tamamlanan batch bekleniyor...")
-                _wait_for_any_in_progress(client, registry, registry_path, poll_interval)
-                print(f"  Kuyrukta yer açıldı, tekrar deneniyor...")
-                continue
-            else:
-                raise
+            ),
+            description=f"Batch oluşturma ({jf.name})"
+        )
+
+        if batch.status == "failed":
+            print(f"  ⚠ Batch creation failed (kuyruk dolu olabilir), bekleniyor...")
+            time.sleep(poll_interval)
+            _update_registry_statuses(client, registry, registry_path)
+            continue  # Aynı dosyayı tekrar dene (yeni upload gerekecek çünkü OpenAI failed file'ı siler)
 
         registry[jf.name] = {
             "batch_id": batch.id,
-            "file_id": file_obj.id,
+            "file_id": uploaded_file_id,
             "status": batch.status,
             "output_file_id": None,
             "error_file_id": None,
         }
         registry_path.write_text(json.dumps(registry, indent=2))
-        print(f"  batch_id: {batch.id}, status: {batch.status}")
+        print(f"  ✓ batch_id: {batch.id}, status: {batch.status}")
         idx += 1
 
-    print(f"\n[submit] Tüm batch'ler gönderildi ({len(pending)} adet).")
-    print(f"  Sonuçları indirmek için: python scripts/embedding_pipeline.py poll --batch-dir {batch_dir}")
+    total_elapsed = time.time() - start_time
+    hours = total_elapsed / 3600
+    print(f"\n[submit] Tüm batch'ler gönderildi ({len(pending)} adet, {hours:.1f} saat).")
+
+    if args.verify:
+        _verify_and_retry(client, batch_dir, registry, registry_path, poll_interval)
 
 
-def _wait_for_any_in_progress(client, registry, registry_path, interval=60):
-    """Kuyrukta yer açılana kadar in_progress batch'lerden birinin bitmesini bekler."""
+# ---------------------------------------------------------------------------
+# VERIFY — Completed batch'leri kontrol et, partial failure varsa retry gönder
+# ---------------------------------------------------------------------------
+
+def _verify_and_retry(client, batch_dir: Path, registry: dict, registry_path: Path, poll_interval: int = 60):
+    """
+    Tüm completed batch'lerin error file'larını kontrol eder.
+    Partial failure (500 hatası) varsa otomatik retry batch oluşturup gönderir.
+    """
+    print(f"\n{'='*60}")
+    print("[verify] Batch doğrulama başlıyor...")
+    print(f"{'='*60}")
+
+    # Önce tüm aktif batch'lerin bitmesini bekle
+    while _count_in_progress(registry) > 0:
+        active = _count_in_progress(registry)
+        print(f"  ⏳ {active} batch hala işleniyor, bekleniyor...")
+        time.sleep(poll_interval)
+        _update_registry_statuses(client, registry, registry_path)
+
+    # Her completed batch'in error file'ını kontrol et
+    all_failed = []
+    checked = 0
+
+    for fname, info in registry.items():
+        if info["status"] != "completed":
+            continue
+        checked += 1
+
+        batch = _api_call(
+            lambda bid=info["batch_id"]: client.batches.retrieve(bid),
+            description=f"Batch sorgulama ({fname})"
+        )
+
+        if not batch.error_file_id:
+            continue
+
+        err_content = _api_call(
+            lambda fid=batch.error_file_id: client.files.content(fid),
+            description=f"Error file indirme ({fname})"
+        )
+        err_text = err_content.text.strip()
+        if not err_text:
+            continue
+
+        for line in err_text.split("\n"):
+            rec = json.loads(line)
+            resp = rec.get("response", {})
+            if resp.get("status_code") != 200:
+                all_failed.append({
+                    "custom_id": rec["custom_id"],
+                    "source_batch": fname,
+                    "status_code": resp.get("status_code"),
+                    "message": resp.get("body", {}).get("error", {}).get("message", ""),
+                })
+
+    print(f"[verify] {checked} completed batch kontrol edildi.")
+
+    if not all_failed:
+        print("[verify] ✓ Tüm batch'ler temiz, partial failure yok!")
+        return
+
+    print(f"[verify] ⚠ {len(all_failed)} partial failure bulundu:")
+    for f in all_failed:
+        print(f"  {f['custom_id']} ({f['source_batch']}): {f['status_code']} - {f['message']}")
+
+    failed_ids = set(f["custom_id"] for f in all_failed)
+
+    # Daha önce retry edilmiş mi kontrol et
+    already_retried = set()
+    for fname, info in registry.items():
+        if fname.startswith("batch_retry_") and info["status"] == "completed":
+            retry_path = batch_dir / fname
+            if retry_path.exists():
+                with open(retry_path) as rf:
+                    for line in rf:
+                        rec = json.loads(line)
+                        already_retried.add(rec["custom_id"])
+
+    still_needed = failed_ids - already_retried
+    if not still_needed:
+        print(f"[verify] ✓ Tüm {len(failed_ids)} failure zaten retry ile kapatılmış!")
+        return
+
+    print(f"[verify] {len(still_needed)} chunk retry edilecek...")
+
+    # Input dosyalarından bu satırları bul
+    retry_lines = []
+    for jf in sorted(batch_dir.glob("batch_[0-9]*.jsonl")):
+        with open(jf) as f:
+            for line in f:
+                rec = json.loads(line)
+                if rec["custom_id"] in still_needed:
+                    retry_lines.append(line.strip())
+
+    if len(retry_lines) != len(still_needed):
+        print(f"[verify] UYARI: {len(still_needed)} ID arandı, {len(retry_lines)} bulundu!")
+
+    # Retry dosyası numaralama
+    existing_nums = []
+    for fname in registry:
+        if fname.startswith("batch_retry_"):
+            try:
+                existing_nums.append(int(fname.split("_")[2].split(".")[0]))
+            except (ValueError, IndexError):
+                pass
+    next_num = max(existing_nums, default=0) + 1
+
+    retry_name = f"batch_retry_{next_num:03d}.jsonl"
+    retry_path = batch_dir / retry_name
+    with open(retry_path, "w") as f:
+        for line in retry_lines:
+            f.write(line + "\n")
+    print(f"[verify] Retry dosyası: {retry_name} ({len(retry_lines)} request)")
+
+    # Retry batch gönder
+    print(f"[verify] Retry batch gönderiliyor...")
+    file_obj = _api_call(
+        lambda: client.files.create(file=open(retry_path, "rb"), purpose="batch"),
+        description="Retry dosya yükleme"
+    )
+    batch = _api_call(
+        lambda fid=file_obj.id: client.batches.create(
+            input_file_id=fid, endpoint="/v1/embeddings", completion_window="24h",
+        ),
+        description="Retry batch oluşturma"
+    )
+
+    registry[retry_name] = {
+        "batch_id": batch.id,
+        "file_id": file_obj.id,
+        "status": batch.status,
+        "output_file_id": None,
+        "error_file_id": None,
+    }
+    registry_path.write_text(json.dumps(registry, indent=2))
+    print(f"  ✓ Retry batch: {batch.id}, status: {batch.status}")
+
+    # Retry batch'in bitmesini bekle
+    print(f"[verify] Retry batch tamamlanması bekleniyor...")
     while True:
-        time.sleep(interval)
-        for fname, info in registry.items():
-            if info["status"] not in ("validating", "in_progress", "finalizing"):
-                continue
-            batch = client.batches.retrieve(info["batch_id"])
-            info["status"] = batch.status
-            counts = batch.request_counts
-            print(f"    [{fname}] {batch.status} "
-                  f"(completed: {counts.completed}/{counts.total}, failed: {counts.failed})")
-
-            if batch.status == "completed":
-                if batch.output_file_id:
-                    info["output_file_id"] = batch.output_file_id
-                if batch.error_file_id:
-                    info["error_file_id"] = batch.error_file_id
-                registry_path.write_text(json.dumps(registry, indent=2))
-                return
-
-            if batch.status in ("failed", "expired", "cancelled"):
-                if batch.error_file_id:
-                    info["error_file_id"] = batch.error_file_id
-                registry_path.write_text(json.dumps(registry, indent=2))
-                return
-
+        time.sleep(30)
+        batch = _api_call(
+            lambda bid=registry[retry_name]["batch_id"]: client.batches.retrieve(bid),
+            description="Retry durum sorgulama"
+        )
+        registry[retry_name]["status"] = batch.status
+        if batch.output_file_id:
+            registry[retry_name]["output_file_id"] = batch.output_file_id
+        if batch.error_file_id:
+            registry[retry_name]["error_file_id"] = batch.error_file_id
         registry_path.write_text(json.dumps(registry, indent=2))
+
+        rc = batch.request_counts
+        print(f"  [{retry_name}] {batch.status} ({rc.completed}/{rc.total} completed)")
+
+        if batch.status in ("completed", "failed", "expired", "cancelled"):
+            break
+
+    if batch.status == "completed":
+        if batch.error_file_id:
+            err = _api_call(
+                lambda fid=batch.error_file_id: client.files.content(fid),
+                description="Retry error file"
+            )
+            if err.text.strip():
+                print(f"[verify] ⚠ Retry batch'te de hatalar var! Manuel kontrol gerekli:")
+                print(f"  {err.text[:500]}")
+                return
+        print(f"[verify] ✓ Retry başarılı! {rc.completed}/{rc.total} chunk tamamlandı.")
+    else:
+        print(f"[verify] ⚠ Retry batch {batch.status}! Manuel kontrol gerekli.")
+
+
+def cmd_verify(args):
+    """Bağımsız verify komutu: tüm completed batch'leri kontrol et, partial failure varsa retry gönder."""
+    from openai import OpenAI
+    client = OpenAI(api_key=_get_api_key())
+    batch_dir = Path(args.batch_dir)
+    registry_path = batch_dir / BATCH_REGISTRY
+
+    if not registry_path.exists():
+        print("[verify] batch_registry.json bulunamadı.")
+        return
+
+    registry = json.loads(registry_path.read_text())
+
+    print("[verify] Mevcut batch durumları güncelleniyor...")
+    _update_registry_statuses(client, registry, registry_path)
+
+    _verify_and_retry(client, batch_dir, registry, registry_path, args.poll_interval)
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -718,11 +974,20 @@ def main():
     p_submit = sub.add_parser("submit", help="Batch dosyalarını OpenAI'a gönder")
     p_submit.add_argument("--batch-dir", default="batch_files", help="JSONL batch dosyalarının dizini")
     p_submit.add_argument("--poll-interval", type=int, default=60, help="Kuyruk dolduğunda bekleme kontrol aralığı (saniye)")
+    p_submit.add_argument("--verify", action="store_true", default=True,
+                          help="Tüm batch'ler gönderildikten sonra otomatik verify + retry (varsayılan: açık)")
+    p_submit.add_argument("--no-verify", action="store_false", dest="verify",
+                          help="Otomatik verify'ı kapat")
 
     # poll
     p_poll = sub.add_parser("poll", help="Batch durumlarını izle ve sonuçları indir")
     p_poll.add_argument("--batch-dir", default="batch_files", help="Batch dosyalarının dizini")
     p_poll.add_argument("--interval", type=int, default=60, help="Kontrol aralığı (saniye, varsayılan: 60)")
+
+    # verify
+    p_verify = sub.add_parser("verify", help="Completed batch'leri kontrol et, partial failure varsa retry gönder")
+    p_verify.add_argument("--batch-dir", default="batch_files", help="Batch dosyalarının dizini")
+    p_verify.add_argument("--poll-interval", type=int, default=60, help="Bekleme kontrol aralığı (saniye)")
 
     # upsert
     p_upsert = sub.add_parser("upsert", help="Embedding sonuçlarını Qdrant'a yaz")
@@ -743,6 +1008,8 @@ def main():
         cmd_submit(args)
     elif args.command == "poll":
         cmd_poll(args)
+    elif args.command == "verify":
+        cmd_verify(args)
     elif args.command == "upsert":
         cmd_upsert(args)
     else:
